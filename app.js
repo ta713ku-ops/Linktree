@@ -413,13 +413,10 @@ function renderTemplateCard(template) {
 function getTemplatePreviewPage(templateId) {
   const sample = templateSamples[templateId] || templateSamples.minimal;
   const page = clone(state.page);
-  page.plan = "pro";
   page.profile.name = sample.title;
   page.profile.handle = sample.handle;
   page.profile.bio = "";
   page.profile.avatarText = sample.title.slice(0, 1);
-  page.profile.avatarSize = templateId === "portfolio" || templateId === "editorial" ? "small" : "normal";
-  page.profile.layout = ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : "center";
   page.sections = [{ id: "main", name: templateId === "portfolio" ? "Works" : "Menu", order: 1, isVisible: true, headingStyle: "plain" }];
   page.links = sample.links.map((title, index) => ({
     id: `${templateId}_${index}`,
@@ -432,22 +429,49 @@ function getTemplatePreviewPage(templateId) {
   }));
   page.snsLinks = ["SNS", "MAIL"];
   page.design = clone(state.page.design);
-  page.design.templateId = templateId;
-  page.design.theme.spacing = "compact";
-  page.design.theme.radius = ["arcade", "cafe", "luxury", "experimental"].includes(templateId) ? "square" : "medium";
-  page.design.theme.buttonStyle = {
-    y2k: "glass",
-    surf: "glass",
-    arcade: "neon",
-    sticky: "paper",
-    luxury: "luxury",
-    experimental: "filled",
-    vinyl: "filled"
-  }[templateId] || "outline";
-  page.design.layout.headerType = ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : templateId === "editorial" ? "magazine" : "center";
-  page.design.layout.linkLayout = templateId === "portfolio" || templateId === "sticky" ? "grid" : templateId === "cafe" ? "menu" : "stack";
-  page.design.layout.snsPosition = ["luxury", "botanical"].includes(templateId) ? "bottom" : "hidden";
+  applyTemplateVisuals(page, templateId);
   return page;
+}
+
+function getTemplateVisualPreset(templateId) {
+  return {
+    profile: {
+      avatarSize: templateId === "portfolio" || templateId === "editorial" ? "small" : "normal",
+      layout: ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : "center"
+    },
+    theme: {
+      spacing: "compact",
+      radius: ["arcade", "cafe", "luxury", "experimental"].includes(templateId) ? "square" : "medium",
+      buttonStyle: {
+        y2k: "glass",
+        surf: "glass",
+        arcade: "neon",
+        sticky: "paper",
+        luxury: "luxury",
+        experimental: "filled",
+        vinyl: "filled"
+      }[templateId] || "outline"
+    },
+    layout: {
+      headerType: ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : templateId === "editorial" ? "magazine" : "center",
+      linkLayout: templateId === "portfolio" || templateId === "sticky" ? "grid" : templateId === "cafe" ? "menu" : "stack",
+      snsPosition: ["luxury", "botanical"].includes(templateId) ? "bottom" : "hidden"
+    }
+  };
+}
+
+function applyTemplateVisuals(page, templateId) {
+  const preset = getTemplateVisualPreset(templateId);
+  page.profile.avatarSize = preset.profile.avatarSize;
+  page.profile.layout = preset.profile.layout;
+  page.design.templateId = templateId;
+  page.design.source = "template";
+  page.design.theme.spacing = preset.theme.spacing;
+  page.design.theme.radius = preset.theme.radius;
+  page.design.theme.buttonStyle = preset.theme.buttonStyle;
+  page.design.layout.headerType = preset.layout.headerType;
+  page.design.layout.linkLayout = preset.layout.linkLayout;
+  page.design.layout.snsPosition = preset.layout.snsPosition;
 }
 
 function renderProfilePanel() {
@@ -965,8 +989,7 @@ document.addEventListener("click", (event) => {
   if (action === "tab") state.activeTab = target.dataset.tab;
   if (action === "set-plan") state.page.plan = target.dataset.plan;
   if (action === "set-template") {
-    state.page.design.templateId = target.dataset.template;
-    state.page.design.source = "template";
+    applyTemplateVisuals(state.page, target.dataset.template);
     state.activeTab = "design";
   }
   if (action === "add-link") addLink();
