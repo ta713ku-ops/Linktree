@@ -15,8 +15,16 @@ const templates = [
   ["editorial", "雑誌 / エディトリアル", "大見出しと目次感"],
   ["craft", "クラフト / ハンドメイド", "紙、布、ステッチ"],
   ["botanical", "ボタニカル", "葉と淡い緑"],
-  ["experimental", "実験アート", "色面と非対称"]
+  ["experimental", "実験アート", "色面と非対称"],
+  ["hero-cover", "ヒーローカバー型", "上部ビジュアルで世界観を見せる"],
+  ["featured-first", "1番目特大カード型", "最重要リンクを大きく押し出す"],
+  ["bento-grid", "Bentoグリッド型", "大小カードで導線を整理"],
+  ["magazine-index", "雑誌目次型", "読み物を目次のように並べる"],
+  ["sns-hub", "SNSハブ型", "SNS導線を主役にする"],
+  ["event-promo", "イベント告知型", "単発告知から外部リンクへ送る"]
 ].map(([id, name, description], index) => ({ id, name, description, order: index + 1 }));
+
+const structuredTemplateIds = ["hero-cover", "featured-first", "bento-grid", "magazine-index", "sns-hub", "event-promo"];
 
 const templateSamples = {
   minimal: {
@@ -93,6 +101,36 @@ const templateSamples = {
     title: "CREATE THE NEW.",
     handle: "アイデアでつなぐ",
     links: ["プロフィール", "作品", "展示・イベント", "NEWS", "お問い合わせ"]
+  },
+  "hero-cover": {
+    title: "Mika Atelier",
+    handle: "静かな世界観を、最初の一枚で。",
+    links: ["Portfolio", "最新のお知らせ", "制作の相談", "Instagram", "お問い合わせ"]
+  },
+  "featured-first": {
+    title: "予約とお知らせ",
+    handle: "いちばん見てほしい導線を先頭に",
+    links: ["5月の先行予約をする", "サービスを見る", "最新記事を読む", "お問い合わせ"]
+  },
+  "bento-grid": {
+    title: "Design Desk",
+    handle: "works / shop / note / contact",
+    links: ["最新プロジェクト", "作品集", "オンラインストア", "制作依頼", "読みもの", "連絡先"]
+  },
+  "magazine-index": {
+    title: "ISSUE 05",
+    handle: "今月の読みものと記録",
+    links: ["巻頭エッセイ", "制作ノート", "インタビュー", "おすすめリスト", "バックナンバー"]
+  },
+  "sns-hub": {
+    title: "Nana Channel",
+    handle: "毎日の発信はこちらから",
+    links: ["YouTube最新回", "お仕事の依頼", "グッズストア", "ファンレター"]
+  },
+  "event-promo": {
+    title: "Night Market",
+    handle: "one night pop-up event",
+    links: ["チケットを予約", "イベント詳細を見る", "アクセス", "FAQ"]
   }
 };
 
@@ -366,7 +404,7 @@ function renderTopPanel() {
     <div class="grid two">
       <div class="setting-card">
         <h2>作成フロー</h2>
-        <div class="bar-row"><span>テンプレート</span><div class="bar-track"><div class="bar-fill" style="width:95%"></div></div><strong>15</strong></div>
+        <div class="bar-row"><span>テンプレート</span><div class="bar-track"><div class="bar-fill" style="width:95%"></div></div><strong>${templates.length}</strong></div>
         <div class="bar-row"><span>手動カスタム</span><div class="bar-track"><div class="bar-fill" style="width:78%"></div></div><strong>8</strong></div>
         <div class="bar-row"><span>AI導線</span><div class="bar-track"><div class="bar-fill" style="width:66%"></div></div><strong>3案</strong></div>
       </div>
@@ -423,32 +461,45 @@ function getTemplatePreviewPage(templateId) {
   page.profile.handle = sample.handle;
   page.profile.bio = "";
   page.profile.avatarText = sample.title.slice(0, 1);
-  page.sections = [{ id: "main", name: templateId === "portfolio" ? "Works" : "Menu", order: 1, isVisible: true, headingStyle: "plain" }];
+  page.sections = [{ id: "main", name: getPreviewSectionName(templateId), order: 1, isVisible: true, headingStyle: "plain" }];
   page.links = sample.links.map((title, index) => ({
     id: `${templateId}_${index}`,
     sectionId: "main",
     title,
     url: "#",
-    role: templateId === "portfolio" || templateId === "sticky" ? "image" : index === 0 ? "featured" : "standard",
+    role: getPreviewLinkRole(templateId, index),
     image: "",
     isVisible: true,
     order: index + 1
   }));
-  page.snsLinks = ["SNS", "MAIL"];
+  page.snsLinks = templateId === "sns-hub" ? ["Instagram", "TikTok", "YouTube", "X"] : ["SNS", "MAIL"];
   page.design = clone(state.page.design);
   applyTemplateVisuals(page, templateId);
   return page;
 }
 
+function getPreviewSectionName(templateId) {
+  if (templateId === "portfolio") return "Works";
+  if (templateId === "magazine-index") return "Contents";
+  if (templateId === "event-promo") return "Links";
+  return "Menu";
+}
+
+function getPreviewLinkRole(templateId, index) {
+  if (["portfolio", "sticky", "bento-grid"].includes(templateId)) return index === 0 ? "featured" : "image";
+  if (["featured-first", "event-promo"].includes(templateId) && index === 0) return "featured";
+  return index === 0 ? "featured" : "standard";
+}
+
 function getTemplateVisualPreset(templateId) {
   return {
     profile: {
-      avatarSize: templateId === "portfolio" || templateId === "editorial" ? "small" : "normal",
-      layout: ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : "center"
+      avatarSize: ["portfolio", "editorial", "bento-grid", "magazine-index", "event-promo"].includes(templateId) ? "small" : "normal",
+      layout: ["surf", "luxury", "experimental", "hero-cover"].includes(templateId) ? "hero" : "center"
     },
     theme: {
-      spacing: "compact",
-      radius: ["arcade", "cafe", "luxury", "experimental"].includes(templateId) ? "square" : "medium",
+      spacing: ["magazine-index", "event-promo"].includes(templateId) ? "relaxed" : "compact",
+      radius: ["arcade", "cafe", "luxury", "experimental", "magazine-index"].includes(templateId) ? "square" : "medium",
       buttonStyle: {
         y2k: "glass",
         surf: "glass",
@@ -456,13 +507,19 @@ function getTemplateVisualPreset(templateId) {
         sticky: "paper",
         luxury: "luxury",
         experimental: "filled",
-        vinyl: "filled"
+        vinyl: "filled",
+        "hero-cover": "glass",
+        "featured-first": "filled",
+        "bento-grid": "soft",
+        "magazine-index": "underline",
+        "sns-hub": "glass",
+        "event-promo": "filled"
       }[templateId] || "outline"
     },
     layout: {
-      headerType: ["surf", "luxury", "experimental"].includes(templateId) ? "hero" : templateId === "editorial" ? "magazine" : "center",
-      linkLayout: templateId === "portfolio" || templateId === "sticky" ? "grid" : templateId === "cafe" ? "menu" : "stack",
-      snsPosition: ["luxury", "botanical"].includes(templateId) ? "bottom" : "hidden"
+      headerType: ["surf", "luxury", "experimental", "hero-cover"].includes(templateId) ? "hero" : ["editorial", "magazine-index"].includes(templateId) ? "magazine" : "center",
+      linkLayout: ["portfolio", "sticky", "bento-grid"].includes(templateId) ? "grid" : templateId === "cafe" ? "menu" : templateId === "featured-first" ? "featured" : "stack",
+      snsPosition: ["luxury", "botanical", "hero-cover"].includes(templateId) ? "bottom" : templateId === "sns-hub" ? "top" : "hidden"
     }
   };
 }
@@ -555,7 +612,7 @@ function renderDesignPanel() {
       <div class="setting-card">
         <h2>見た目</h2>
         <div class="form-grid">
-          ${select("ボタン", "page.design.theme.buttonStyle", d.theme.buttonStyle, [["outline", "枠線"], ["filled", "塗り"], ["glass", "半透明"], ["paper", "紙風"], ["neon", "ネオン"], ["luxury", "高級感"]])}
+          ${select("ボタン", "page.design.theme.buttonStyle", d.theme.buttonStyle, [["outline", "枠線"], ["filled", "塗り"], ["soft", "やわらかい"], ["glass", "半透明"], ["paper", "紙風"], ["underline", "下線"], ["neon", "ネオン"], ["luxury", "高級感"]])}
           ${select("角丸", "page.design.theme.radius", d.theme.radius, [["small", "小"], ["medium", "中"], ["large", "大"], ["pill", "丸"], ["square", "四角"]])}
           ${select("余白", "page.design.theme.spacing", d.theme.spacing, [["compact", "コンパクト"], ["normal", "標準"], ["relaxed", "ゆったり"]])}
           ${select("装飾量", "page.design.theme.decorationLevel", d.theme.decorationLevel, [["none", "なし"], ["subtle", "控えめ"], ["rich", "しっかり"]])}
@@ -929,10 +986,23 @@ function renderPageHTML(page, compact = false) {
     hasAvatarImage ? `--avatar-image:${cssUrl(page.profile.avatarImage)}` : ""
   ].filter(Boolean).join(";");
   const avatarText = hasAvatarImage ? "" : escapeHTML(page.profile.avatarText || page.profile.name || "L").slice(0, 2);
+  const avatarHTML = `<div class="avatar ${hasAvatarImage ? "has-image" : ""}" style="${escapeHTML(avatarStyle)}">${avatarText}</div>`;
+  const context = {
+    pageClasses,
+    pageStyle,
+    buttonClass,
+    profileClass,
+    linkLayout,
+    sns,
+    showSnsTop,
+    showSnsBottom,
+    avatarHTML
+  };
+  if (structuredTemplateIds.includes(templateId)) return renderStructuredTemplatePage(page, compact, context);
   return `
     <div class="${pageClasses}"${pageStyle ? ` style="${escapeHTML(pageStyle)}"` : ""}>
       <section class="profile ${profileClass}">
-        <div class="avatar ${hasAvatarImage ? "has-image" : ""}" style="${escapeHTML(avatarStyle)}">${avatarText}</div>
+        ${avatarHTML}
         <div>
           <h2>${escapeHTML(page.profile.name)}</h2>
           <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
@@ -940,22 +1010,191 @@ function renderPageHTML(page, compact = false) {
         </div>
       </section>
       ${showSnsTop ? sns : ""}
-      ${page.sections.filter((section) => section.isVisible).sort((a, b) => a.order - b.order).map((section) => {
-        const links = page.links.filter((link) => link.sectionId === section.id && link.isVisible).sort((a, b) => a.order - b.order);
-        if (!links.length) return "";
-        return `
-          <section class="page-section">
-            <h3>${escapeHTML(section.name)}</h3>
-            <div class="links ${linkLayout === "grid" || linkLayout === "cards" ? "grid" : ""}">
-              ${links.map((link) => renderLinkButton(link, linkLayout, buttonClass)).join("")}
-            </div>
-          </section>
-        `;
-      }).join("")}
+      ${renderGenericPageSections(page, linkLayout, buttonClass)}
       ${showSnsBottom ? sns : ""}
-      ${page.plan === "basic" && !compact ? `<div class="brand-foot">Made with Link Atelier</div>` : ""}
+      ${renderBrandFoot(page, compact)}
     </div>
   `;
+}
+
+function renderStructuredTemplatePage(page, compact, context) {
+  const templateId = page.design.templateId;
+  const content = {
+    "hero-cover": renderHeroCoverPage,
+    "featured-first": renderFeaturedFirstPage,
+    "bento-grid": renderBentoGridPage,
+    "magazine-index": renderMagazineIndexPage,
+    "sns-hub": renderSnsHubPage,
+    "event-promo": renderEventPromoPage
+  }[templateId](page, context);
+  return `
+    <div class="${context.pageClasses} structured-template"${context.pageStyle ? ` style="${escapeHTML(context.pageStyle)}"` : ""}>
+      ${content}
+      ${renderBrandFoot(page, compact)}
+    </div>
+  `;
+}
+
+function renderHeroCoverPage(page, context) {
+  const links = getOrderedVisibleLinks(page).slice(0, 5);
+  return `
+    <section class="hero-cover-panel">
+      <div class="hero-cover-visual"></div>
+      <div class="hero-cover-profile">
+        ${context.avatarHTML}
+        <div>
+          <h2>${escapeHTML(page.profile.name)}</h2>
+          <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
+          <p class="profile-bio">${escapeHTML(page.profile.bio)}</p>
+        </div>
+      </div>
+    </section>
+    ${renderSns(page, "center")}
+    <section class="page-section hero-cover-links">
+      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+    </section>
+  `;
+}
+
+function renderFeaturedFirstPage(page, context) {
+  const links = getOrderedVisibleLinks(page);
+  const [primary, ...rest] = links;
+  return `
+    <section class="profile center featured-first-profile">
+      ${context.avatarHTML}
+      <div>
+        <h2>${escapeHTML(page.profile.name)}</h2>
+        <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
+        <p class="profile-bio">${escapeHTML(page.profile.bio)}</p>
+      </div>
+    </section>
+    ${renderSns(page, "center")}
+    <section class="page-section featured-first-links">
+      ${primary ? renderLinkButton(primary, "cards", `${context.buttonClass} featured-first-card`) : ""}
+      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+    </section>
+  `;
+}
+
+function renderBentoGridPage(page, context) {
+  const links = getOrderedVisibleLinks(page);
+  return `
+    <section class="bento-profile-card">
+      ${context.avatarHTML}
+      <div>
+        <h2>${escapeHTML(page.profile.name)}</h2>
+        <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
+        <p class="profile-bio">${escapeHTML(page.profile.bio)}</p>
+      </div>
+    </section>
+    <section class="bento-link-grid">
+      ${links.map((link, index) => renderLinkButton(link, "cards", `${context.buttonClass} bento-card ${index === 0 ? "bento-card-wide" : ""}`)).join("")}
+    </section>
+  `;
+}
+
+function renderMagazineIndexPage(page, context) {
+  const links = getOrderedVisibleLinks(page);
+  return `
+    <section class="magazine-head">
+      <div class="magazine-title-line">
+        <div>
+          <p class="magazine-kicker">LINK INDEX</p>
+          <h2>${escapeHTML(page.profile.name)}</h2>
+        </div>
+        ${context.avatarHTML}
+      </div>
+      <p>${escapeHTML(page.profile.handle || page.profile.bio)}</p>
+    </section>
+    <section class="magazine-list">
+      ${links.map((link, index) => renderMagazineLink(link, index, context.buttonClass)).join("")}
+    </section>
+    ${renderSns(page, "center")}
+  `;
+}
+
+function renderSnsHubPage(page, context) {
+  const links = getOrderedVisibleLinks(page);
+  return `
+    <section class="profile center sns-hub-profile">
+      ${context.avatarHTML}
+      <div>
+        <h2>${escapeHTML(page.profile.name)}</h2>
+        <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
+        <p class="profile-bio">${escapeHTML(page.profile.bio)}</p>
+      </div>
+    </section>
+    <section class="sns-hub-block">
+      <h3>Follow me</h3>
+      <div class="sns-hub-icons">${page.snsLinks.map((sns) => `<a class="sns-hub-icon" href="#">${escapeHTML(sns)}</a>`).join("")}</div>
+    </section>
+    <section class="page-section sns-hub-links">
+      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+    </section>
+  `;
+}
+
+function renderEventPromoPage(page, context) {
+  const links = getOrderedVisibleLinks(page);
+  const [ticket, ...rest] = links;
+  return `
+    <section class="event-visual">
+      <div class="event-avatar">${context.avatarHTML}</div>
+      <p>POP-UP EVENT</p>
+      <h2>${escapeHTML(page.profile.name)}</h2>
+    </section>
+    <section class="event-meta-grid">
+      <div><span>DATE</span><strong>2026.06.21</strong></div>
+      <div><span>TIME</span><strong>18:00 OPEN</strong></div>
+      <div><span>PLACE</span><strong>Nakameguro</strong></div>
+    </section>
+    <p class="event-lead">${escapeHTML(page.profile.handle || page.profile.bio)}</p>
+    <section class="page-section event-links">
+      ${ticket ? renderLinkButton(ticket, "stack", `${context.buttonClass} event-ticket-button`) : ""}
+      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+    </section>
+  `;
+}
+
+function renderGenericPageSections(page, linkLayout, buttonClass) {
+  return getOrderedSections(page).map((section) => {
+    const links = getOrderedLinksForSection(page, section.id);
+    if (!links.length) return "";
+    return `
+      <section class="page-section">
+        <h3>${escapeHTML(section.name)}</h3>
+        <div class="links ${linkLayout === "grid" || linkLayout === "cards" ? "grid" : ""}">
+          ${links.map((link) => renderLinkButton(link, linkLayout, buttonClass)).join("")}
+        </div>
+      </section>
+    `;
+  }).join("");
+}
+
+function getOrderedSections(page) {
+  return page.sections.filter((section) => section.isVisible).sort((a, b) => a.order - b.order);
+}
+
+function getOrderedLinksForSection(page, sectionId) {
+  return page.links.filter((link) => link.sectionId === sectionId && link.isVisible).sort((a, b) => a.order - b.order);
+}
+
+function getOrderedVisibleLinks(page) {
+  return getOrderedSections(page).flatMap((section) => getOrderedLinksForSection(page, section.id));
+}
+
+function renderMagazineLink(link, index, buttonClass) {
+  return `
+    <a class="${buttonClass} magazine-link" href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">
+      <span class="magazine-number">${String(index + 1).padStart(2, "0")}</span>
+      <span>${escapeHTML(link.title)}</span>
+      <b>読む</b>
+    </a>
+  `;
+}
+
+function renderBrandFoot(page, compact) {
+  return page.plan === "basic" && !compact ? `<div class="brand-foot">Made with Link Atelier</div>` : "";
 }
 
 function renderSns(page, profileClass) {
