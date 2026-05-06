@@ -180,11 +180,16 @@ const defaultState = {
       avatarSize: "normal",
       layout: "center"
     },
+    eventMeta: {
+      date: "2026.06.21",
+      time: "18:00 OPEN",
+      place: "Nakameguro"
+    },
     links: [
-      { id: "link_1", sectionId: "main", title: "最新のプロジェクトを見る", url: "https://example.com/project", role: "featured", image: "", isVisible: true, order: 1 },
-      { id: "link_2", sectionId: "main", title: "Instagram", url: "https://example.com/instagram", role: "standard", image: "", isVisible: true, order: 2 },
-      { id: "link_3", sectionId: "main", title: "予約・お問い合わせ", url: "https://example.com/contact", role: "brand", image: "", isVisible: true, order: 3 },
-      { id: "link_4", sectionId: "works", title: "制作実績", url: "https://example.com/works", role: "image", image: "", isVisible: true, order: 4 }
+      { id: "link_1", sectionId: "main", title: "最新のプロジェクトを見る", url: "https://example.com/project", role: "featured", image: "", backgroundImage: "", backgroundOpacity: 0.48, isVisible: true, order: 1 },
+      { id: "link_2", sectionId: "main", title: "Instagram", url: "https://example.com/instagram", role: "standard", image: "", backgroundImage: "", backgroundOpacity: 0.48, isVisible: true, order: 2 },
+      { id: "link_3", sectionId: "main", title: "予約・お問い合わせ", url: "https://example.com/contact", role: "brand", image: "", backgroundImage: "", backgroundOpacity: 0.48, isVisible: true, order: 3 },
+      { id: "link_4", sectionId: "works", title: "制作実績", url: "https://example.com/works", role: "image", image: "", backgroundImage: "", backgroundOpacity: 0.48, isVisible: true, order: 4 }
     ],
     sections: [
       { id: "main", name: "Main Links", order: 1, isVisible: true, headingStyle: "line" },
@@ -209,8 +214,7 @@ const defaultState = {
       },
       custom: {
         images: {
-          pageBackground: "",
-          buttonBackground: ""
+          pageBackground: ""
         },
         colors: {
           pageText: "",
@@ -555,6 +559,21 @@ function renderProfilePanel() {
         ${select("写真サイズ", "page.profile.avatarSize", p.avatarSize, [["small", "小さめ"], ["normal", "標準"], ["large", "大きめ"]])}
         ${select("プロフィール配置", "page.profile.layout", p.layout, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"]])}
       </div>
+      ${state.page.design.templateId === "event-promo" ? renderEventMetaFields() : ""}
+    </div>
+  `;
+}
+
+function renderEventMetaFields() {
+  const eventMeta = state.page.eventMeta || defaultState.page.eventMeta;
+  return `
+    <div class="setting-card">
+      <h2>イベント情報</h2>
+      <div class="grid three">
+        ${input("日付", "page.eventMeta.date", eventMeta.date)}
+        ${input("時間", "page.eventMeta.time", eventMeta.time)}
+        ${input("場所", "page.eventMeta.place", eventMeta.place)}
+      </div>
     </div>
   `;
 }
@@ -638,7 +657,6 @@ function renderImageCustomPanel(design) {
       <h2>背景画像</h2>
       <div class="grid two">
         ${imageUploadControl("ページ背景", "pageBackground", images.pageBackground)}
-        ${imageUploadControl("ボタン背景", "buttonBackground", images.buttonBackground)}
       </div>
     </div>
   `;
@@ -679,20 +697,65 @@ function profileImageUploadControl(value) {
 }
 
 function linkImageUploadControl(link) {
-  const hasImage = Boolean(link.image);
-  const previewStyle = hasImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(link.image)}`)}"` : "";
+  const visibleIndex = getOrderedVisibleLinks(state.page).findIndex((item) => item.id === link.id);
+  const imageControl = linkUsesInnerImageSlot(state.page, visibleIndex) ? linkImageField(link, "リンク内画像", "image", link.image, getInnerImageSlotLabel(state.page, visibleIndex)) : "";
+  const backgroundControl = linkImageField(link, "リンク背景", "backgroundImage", link.backgroundImage, "", link.backgroundImage ? linkBackgroundOpacityControl(link) : "");
   return `
     <div class="link-image-control">
-      <h3>リンク画像</h3>
-      <div class="image-upload-row">
-        <div class="image-preview link-image-preview ${hasImage ? "has-image" : ""}"${previewStyle}>${hasImage ? "" : "未設定"}</div>
-        <div class="image-upload-actions">
-          <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-link-image-id="${link.id}"></label>
-          ${hasImage ? `<button class="danger-button" data-action="clear-link-image" data-id="${link.id}">削除</button>` : ""}
-        </div>
+      <div class="grid two">
+        ${backgroundControl}
+        ${imageControl}
       </div>
     </div>
   `;
+}
+
+function linkUsesInnerImageSlot(page, index) {
+  const templateId = page.design.templateId;
+  if (["sticky", "portfolio", "bento-grid"].includes(templateId)) return true;
+  if (templateId === "featured-first") return index === 0;
+  return page.design.layout.linkLayout === "cards";
+}
+
+function getInnerImageSlotLabel(page, index) {
+  const template = getTemplate(page.design.templateId);
+  if (page.design.templateId === "featured-first") return `${template.order}番テンプレの1番目の大きいカード内に表示`;
+  return `${template.order}番テンプレのリンク内の四角に表示`;
+}
+
+function linkImageField(link, label, field, value, note = "", extraControl = "") {
+  const hasImage = Boolean(value);
+  const previewStyle = hasImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(value)}`)}"` : "";
+  return `
+    <div>
+      <h3>${label}</h3>
+      ${note ? `<p class="image-field-note">${escapeHTML(note)}</p>` : ""}
+      <div class="image-upload-row">
+        <div class="image-preview link-image-preview ${hasImage ? "has-image" : ""}"${previewStyle}>${hasImage ? "" : "未設定"}</div>
+        <div class="image-upload-actions">
+          <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-link-image-id="${link.id}" data-link-image-field="${field}"></label>
+          ${hasImage ? `<button class="danger-button" data-action="clear-link-image" data-id="${link.id}" data-link-image-field="${field}">削除</button>` : ""}
+        </div>
+      </div>
+      ${extraControl}
+    </div>
+  `;
+}
+
+function linkBackgroundOpacityControl(link) {
+  const opacity = getLinkBackgroundOpacity(link);
+  return `
+    <label class="range-control">
+      <span>背景の濃さ <strong>${Math.round(opacity * 100)}%</strong></span>
+      <input type="range" min="0.1" max="1" step="0.05" data-bind="link.${link.id}.backgroundOpacity" value="${escapeHTML(opacity)}">
+    </label>
+  `;
+}
+
+function getLinkBackgroundOpacity(link) {
+  const value = Number(link.backgroundOpacity);
+  if (!Number.isFinite(value)) return 0.48;
+  return Math.min(1, Math.max(0.1, value));
 }
 
 function renderTextColorPanel(design) {
@@ -796,7 +859,7 @@ function renderAiSuggestions() {
 
 function renderKeepsPanel() {
   return `
-    ${panelIntro("キープデザイン", "公開前に比較しながら戻せるデザイン候補です。", `<button class="solid-button" data-action="keep-current">現在のデザインをキープ</button>`)}
+    ${panelIntro("キープデザイン", "公開前に比較しながら戻せるデザイン候補です。")}
     <div class="grid two">
       ${state.keeps.length ? state.keeps.map(renderKeepCard).join("") : `<div class="setting-card"><h2>キープなし</h2><p class="muted">現在のデザインまたはAI案をキープできます。</p></div>`}
     </div>
@@ -931,7 +994,10 @@ function renderPhonePreview() {
         <p class="eyebrow">Phone Preview</p>
         <h2>${escapeHTML(getTemplate().name)}</h2>
       </div>
-      <button class="ghost-button" data-action="public-preview">公開</button>
+      <div class="row-actions">
+        <button class="ghost-button" data-action="public-preview">公開</button>
+        <button class="solid-button" data-action="keep-current">キープ</button>
+      </div>
     </div>
     <div class="phone-frame"><div class="phone-screen">${renderPageHTML(state.page)}</div></div>
   `;
@@ -950,7 +1016,6 @@ function renderPageHTML(page, compact = false) {
   const d = page.design;
   const custom = d.custom || {};
   const hasPageBackground = Boolean(custom.images?.pageBackground);
-  const hasButtonBackground = Boolean(custom.images?.buttonBackground);
   const hasAvatarImage = Boolean(page.profile.avatarImage);
   const templateId = d.templateId;
   const headerType = d.layout.headerType === "magazine" ? "left" : d.layout.headerType;
@@ -966,7 +1031,6 @@ function renderPageHTML(page, compact = false) {
   ].filter(Boolean).join(" ");
   const pageStyle = customStyle({
     "--custom-page-bg": hasPageBackground ? cssUrl(custom.images.pageBackground) : "",
-    "--button-image": hasButtonBackground ? cssUrl(custom.images.buttonBackground) : "",
     "--page-text": custom.colors?.pageText,
     "--profile-name-color": custom.colors?.profileName,
     "--profile-handle-color": custom.colors?.profileHandle,
@@ -975,8 +1039,7 @@ function renderPageHTML(page, compact = false) {
     "--link-text-color": custom.colors?.linkText
   });
   const buttonClass = [
-    "link-button",
-    hasButtonBackground ? "has-button-image" : ""
+    "link-button"
   ].join(" ");
   const sns = renderSns(page, profileClass);
   const showSnsTop = ["top", "both"].includes(d.layout.snsPosition);
@@ -1051,7 +1114,7 @@ function renderHeroCoverPage(page, context) {
     </section>
     ${renderSns(page, "center")}
     <section class="page-section hero-cover-links">
-      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass, false)).join("")}</div>
     </section>
   `;
 }
@@ -1071,7 +1134,7 @@ function renderFeaturedFirstPage(page, context) {
     ${renderSns(page, "center")}
     <section class="page-section featured-first-links">
       ${primary ? renderLinkButton(primary, "cards", `${context.buttonClass} featured-first-card`) : ""}
-      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass, false)).join("")}</div>
     </section>
   `;
 }
@@ -1129,7 +1192,7 @@ function renderSnsHubPage(page, context) {
       <div class="sns-hub-icons">${page.snsLinks.map((sns) => `<a class="sns-hub-icon" href="#">${escapeHTML(sns)}</a>`).join("")}</div>
     </section>
     <section class="page-section sns-hub-links">
-      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+      <div class="links">${links.map((link) => renderLinkButton(link, "stack", context.buttonClass, false)).join("")}</div>
     </section>
   `;
 }
@@ -1137,6 +1200,7 @@ function renderSnsHubPage(page, context) {
 function renderEventPromoPage(page, context) {
   const links = getOrderedVisibleLinks(page);
   const [ticket, ...rest] = links;
+  const eventMeta = page.eventMeta || defaultState.page.eventMeta;
   return `
     <section class="event-visual">
       <div class="event-avatar">${context.avatarHTML}</div>
@@ -1144,14 +1208,14 @@ function renderEventPromoPage(page, context) {
       <h2>${escapeHTML(page.profile.name)}</h2>
     </section>
     <section class="event-meta-grid">
-      <div><span>DATE</span><strong>2026.06.21</strong></div>
-      <div><span>TIME</span><strong>18:00 OPEN</strong></div>
-      <div><span>PLACE</span><strong>Nakameguro</strong></div>
+      <div><span>DATE</span><strong>${escapeHTML(eventMeta.date)}</strong></div>
+      <div><span>TIME</span><strong>${escapeHTML(eventMeta.time)}</strong></div>
+      <div><span>PLACE</span><strong>${escapeHTML(eventMeta.place)}</strong></div>
     </section>
     <p class="event-lead">${escapeHTML(page.profile.handle || page.profile.bio)}</p>
     <section class="page-section event-links">
-      ${ticket ? renderLinkButton(ticket, "stack", `${context.buttonClass} event-ticket-button`) : ""}
-      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass)).join("")}</div>
+      ${ticket ? renderLinkButton(ticket, "stack", `${context.buttonClass} event-ticket-button`, false) : ""}
+      <div class="links">${rest.map((link) => renderLinkButton(link, "stack", context.buttonClass, false)).join("")}</div>
     </section>
   `;
 }
@@ -1164,11 +1228,15 @@ function renderGenericPageSections(page, linkLayout, buttonClass) {
       <section class="page-section">
         <h3>${escapeHTML(section.name)}</h3>
         <div class="links ${linkLayout === "grid" || linkLayout === "cards" ? "grid" : ""}">
-          ${links.map((link) => renderLinkButton(link, linkLayout, buttonClass)).join("")}
+          ${links.map((link) => renderLinkButton(link, linkLayout, buttonClass, templateSupportsInnerImages(page))).join("")}
         </div>
       </section>
     `;
   }).join("");
+}
+
+function templateSupportsInnerImages(page) {
+  return ["sticky", "portfolio", "bento-grid"].includes(page.design.templateId) || page.design.layout.linkLayout === "cards";
 }
 
 function getOrderedSections(page) {
@@ -1201,12 +1269,14 @@ function renderSns(page, profileClass) {
   return `<div class="sns-line ${profileClass === "center" ? "center" : ""}">${page.snsLinks.map((sns) => `<a class="sns-pill" href="#">${escapeHTML(sns)}</a>`).join("")}</div>`;
 }
 
-function renderLinkButton(link, layout, buttonClass = "link-button") {
-  const hasThumb = link.role === "image" || layout === "cards";
+function renderLinkButton(link, layout, buttonClass = "link-button", allowInnerImage = true) {
+  const hasThumb = allowInnerImage;
   const thumbStyle = link.image ? ` style="${escapeHTML(`--link-image:${cssUrl(link.image)}`)}"` : "";
   const thumb = hasThumb ? `<div class="link-thumb ${link.image ? "has-image" : ""}"${thumbStyle}></div>` : "";
   const featured = link.role === "featured" || layout === "featured" ? "featured" : "";
-  return `<a class="${buttonClass} ${featured}" href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">${thumb}<span>${escapeHTML(link.title)}</span><b>›</b></a>`;
+  const hasBackground = Boolean(link.backgroundImage);
+  const backgroundStyle = hasBackground ? ` style="${escapeHTML(`--link-background-image:${cssUrl(link.backgroundImage)};--link-background-opacity:${getLinkBackgroundOpacity(link)}`)}"` : "";
+  return `<a class="${buttonClass} ${featured} ${hasBackground ? "has-link-background" : ""}"${backgroundStyle} href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">${thumb}<span>${escapeHTML(link.title)}</span><b>›</b></a>`;
 }
 
 function input(labelText, bind, value) {
@@ -1256,7 +1326,7 @@ document.addEventListener("click", (event) => {
   if (action === "set-plan") state.page.plan = target.dataset.plan;
   if (action === "set-template") {
     applyTemplateVisuals(state.page, target.dataset.template);
-    state.activeTab = "design";
+    state.activeTab = "profile";
   }
   if (action === "add-link") addLink();
   if (action === "remove-link") removeLink(target.dataset.id);
@@ -1271,7 +1341,7 @@ document.addEventListener("click", (event) => {
   if (action === "remove-keep") state.keeps = state.keeps.filter((keep) => keep.id !== target.dataset.id);
   if (action === "clear-custom-image") clearCustomImage(target.dataset.imageTarget);
   if (action === "clear-profile-image") clearProfileImage();
-  if (action === "clear-link-image") clearLinkImage(target.dataset.id);
+  if (action === "clear-link-image") clearLinkImage(target.dataset.id, target.dataset.linkImageField);
   if (action === "public-preview") state.publicPreview = true;
   if (action === "close-public-preview") state.publicPreview = false;
   if (action === "mock-alert") window.alert(target.dataset.message || "Prototype");
@@ -1348,22 +1418,23 @@ function readOptimizedImage(file, options = {}) {
 function readLinkImage(inputElement) {
   const file = inputElement.files?.[0];
   const linkId = inputElement.dataset.linkImageId;
+  const imageField = inputElement.dataset.linkImageField || "image";
   if (!file || !linkId) return;
   readOptimizedImage(file, { maxWidth: 900, maxHeight: 900, quality: 0.78 })
     .then((imageData) => {
       const link = state.page.links.find((item) => item.id === linkId);
       if (!link) return;
-      link.image = imageData;
-      link.role = "image";
+      link[imageField] = imageData;
+      if (imageField === "image") link.role = "image";
       saveState();
       render();
     })
     .catch(() => window.alert("画像を読み込めませんでした。別の画像で試してください。"));
 }
 
-function clearLinkImage(linkId) {
+function clearLinkImage(linkId, imageField = "image") {
   const link = state.page.links.find((item) => item.id === linkId);
-  if (link) link.image = "";
+  if (link) link[imageField] = "";
 }
 
 function setCustomImage(imageTarget, value) {
@@ -1431,6 +1502,8 @@ function addLink() {
     url: "https://example.com",
     role: "standard",
     image: "",
+    backgroundImage: "",
+    backgroundOpacity: 0.48,
     isVisible: true,
     order: state.page.links.length + 1
   });
