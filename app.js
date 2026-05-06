@@ -143,10 +143,10 @@ const defaultState = {
       layout: "center"
     },
     links: [
-      { id: "link_1", sectionId: "main", title: "最新のプロジェクトを見る", url: "https://example.com/project", role: "featured", isVisible: true, order: 1 },
-      { id: "link_2", sectionId: "main", title: "Instagram", url: "https://example.com/instagram", role: "standard", isVisible: true, order: 2 },
-      { id: "link_3", sectionId: "main", title: "予約・お問い合わせ", url: "https://example.com/contact", role: "brand", isVisible: true, order: 3 },
-      { id: "link_4", sectionId: "works", title: "制作実績", url: "https://example.com/works", role: "image", isVisible: true, order: 4 }
+      { id: "link_1", sectionId: "main", title: "最新のプロジェクトを見る", url: "https://example.com/project", role: "featured", image: "", isVisible: true, order: 1 },
+      { id: "link_2", sectionId: "main", title: "Instagram", url: "https://example.com/instagram", role: "standard", image: "", isVisible: true, order: 2 },
+      { id: "link_3", sectionId: "main", title: "予約・お問い合わせ", url: "https://example.com/contact", role: "brand", image: "", isVisible: true, order: 3 },
+      { id: "link_4", sectionId: "works", title: "制作実績", url: "https://example.com/works", role: "image", image: "", isVisible: true, order: 4 }
     ],
     sections: [
       { id: "main", name: "Main Links", order: 1, isVisible: true, headingStyle: "line" },
@@ -224,7 +224,13 @@ function clone(value) {
 
 function saveState() {
   state.page.updatedAt = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    window.alert("画像の保存容量を超えました。もう少し軽い画像で試してください。");
+    return false;
+  }
 }
 
 function mergeDeep(target, source) {
@@ -424,6 +430,7 @@ function getTemplatePreviewPage(templateId) {
     title,
     url: "#",
     role: templateId === "portfolio" || templateId === "sticky" ? "image" : index === 0 ? "featured" : "standard",
+    image: "",
     isVisible: true,
     order: index + 1
   }));
@@ -513,6 +520,7 @@ function renderLinksPanel() {
           ${select("表示タイプ", `link.${link.id}.role`, link.role, [["standard", "通常"], ["featured", "目立たせる"], ["brand", "ブランド"], ["image", "画像付き"]])}
           <label class="toggle-line"><input type="checkbox" data-bind="link.${link.id}.isVisible" ${link.isVisible ? "checked" : ""}>表示する</label>
         </div>
+        ${linkImageUploadControl(link)}
       </article>
     `).join("")}
   `;
@@ -607,6 +615,23 @@ function profileImageUploadControl(value) {
         <div class="image-upload-actions">
           <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-profile-image="avatarImage"></label>
           ${hasImage ? `<button class="danger-button" data-action="clear-profile-image">削除</button>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function linkImageUploadControl(link) {
+  const hasImage = Boolean(link.image);
+  const previewStyle = hasImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(link.image)}`)}"` : "";
+  return `
+    <div class="link-image-control">
+      <h3>リンク画像</h3>
+      <div class="image-upload-row">
+        <div class="image-preview link-image-preview ${hasImage ? "has-image" : ""}"${previewStyle}>${hasImage ? "" : "未設定"}</div>
+        <div class="image-upload-actions">
+          <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-link-image-id="${link.id}"></label>
+          ${hasImage ? `<button class="danger-button" data-action="clear-link-image" data-id="${link.id}">削除</button>` : ""}
         </div>
       </div>
     </div>
@@ -938,7 +963,9 @@ function renderSns(page, profileClass) {
 }
 
 function renderLinkButton(link, layout, buttonClass = "link-button") {
-  const thumb = link.role === "image" || layout === "cards" ? `<div class="link-thumb"></div>` : "";
+  const hasThumb = link.role === "image" || layout === "cards";
+  const thumbStyle = link.image ? ` style="${escapeHTML(`--link-image:${cssUrl(link.image)}`)}"` : "";
+  const thumb = hasThumb ? `<div class="link-thumb ${link.image ? "has-image" : ""}"${thumbStyle}></div>` : "";
   const featured = link.role === "featured" || layout === "featured" ? "featured" : "";
   return `<a class="${buttonClass} ${featured}" href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">${thumb}<span>${escapeHTML(link.title)}</span><b>›</b></a>`;
 }
@@ -1005,6 +1032,7 @@ document.addEventListener("click", (event) => {
   if (action === "remove-keep") state.keeps = state.keeps.filter((keep) => keep.id !== target.dataset.id);
   if (action === "clear-custom-image") clearCustomImage(target.dataset.imageTarget);
   if (action === "clear-profile-image") clearProfileImage();
+  if (action === "clear-link-image") clearLinkImage(target.dataset.id);
   if (action === "public-preview") state.publicPreview = true;
   if (action === "close-public-preview") state.publicPreview = false;
   if (action === "mock-alert") window.alert(target.dataset.message || "Prototype");
@@ -1030,6 +1058,10 @@ document.addEventListener("change", (event) => {
     readProfileImage(target);
     return;
   }
+  if (target.type === "file" && target.dataset.linkImageId) {
+    readLinkImage(target);
+    return;
+  }
   if (!target.dataset.bind) return;
   updateBind(target.dataset.bind, target.type === "checkbox" ? target.checked : target.value);
   saveState();
@@ -1040,13 +1072,59 @@ function readCustomImage(inputElement) {
   const file = inputElement.files?.[0];
   const imageTarget = inputElement.dataset.imageTarget;
   if (!file || !imageTarget) return;
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    setCustomImage(imageTarget, reader.result);
-    saveState();
-    render();
+  readOptimizedImage(file, imageTarget === "pageBackground" ? { maxWidth: 1440, maxHeight: 2560, quality: 0.82 } : { maxWidth: 1200, maxHeight: 900, quality: 0.78 })
+    .then((imageData) => {
+      setCustomImage(imageTarget, imageData);
+      saveState();
+      render();
+    })
+    .catch(() => window.alert("画像を読み込めませんでした。別の画像で試してください。"));
+}
+
+function readOptimizedImage(file, options = {}) {
+  const { maxWidth = 1200, maxHeight = 1200, quality = 0.82 } = options;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", reject);
+    reader.addEventListener("load", () => {
+      const image = new Image();
+      image.addEventListener("error", reject);
+      image.addEventListener("load", () => {
+        const ratio = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+        const width = Math.max(1, Math.round(image.naturalWidth * ratio));
+        const height = Math.max(1, Math.round(image.naturalHeight * ratio));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      });
+      image.src = reader.result;
+    });
+    reader.readAsDataURL(file);
   });
-  reader.readAsDataURL(file);
+}
+
+function readLinkImage(inputElement) {
+  const file = inputElement.files?.[0];
+  const linkId = inputElement.dataset.linkImageId;
+  if (!file || !linkId) return;
+  readOptimizedImage(file, { maxWidth: 900, maxHeight: 900, quality: 0.78 })
+    .then((imageData) => {
+      const link = state.page.links.find((item) => item.id === linkId);
+      if (!link) return;
+      link.image = imageData;
+      link.role = "image";
+      saveState();
+      render();
+    })
+    .catch(() => window.alert("画像を読み込めませんでした。別の画像で試してください。"));
+}
+
+function clearLinkImage(linkId) {
+  const link = state.page.links.find((item) => item.id === linkId);
+  if (link) link.image = "";
 }
 
 function setCustomImage(imageTarget, value) {
@@ -1062,13 +1140,13 @@ function clearCustomImage(imageTarget) {
 function readProfileImage(inputElement) {
   const file = inputElement.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    state.page.profile.avatarImage = reader.result || "";
-    saveState();
-    render();
-  });
-  reader.readAsDataURL(file);
+  readOptimizedImage(file, { maxWidth: 640, maxHeight: 640, quality: 0.82 })
+    .then((imageData) => {
+      state.page.profile.avatarImage = imageData;
+      saveState();
+      render();
+    })
+    .catch(() => window.alert("画像を読み込めませんでした。別の画像で試してください。"));
 }
 
 function clearProfileImage() {
@@ -1113,6 +1191,7 @@ function addLink() {
     title: "新しいリンク",
     url: "https://example.com",
     role: "standard",
+    image: "",
     isVisible: true,
     order: state.page.links.length + 1
   });

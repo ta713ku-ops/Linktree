@@ -475,6 +475,14 @@ textarea {
   color: #fffaf0;
 }
 
+.link-image-control {
+  margin-top: 12px;
+}
+
+.link-image-preview {
+  aspect-ratio: 16 / 10;
+}
+
 .image-upload-actions {
   display: flex;
   flex-wrap: wrap;
@@ -490,7 +498,11 @@ textarea {
 }
 
 .image-picker input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .color-grid {
@@ -768,6 +780,12 @@ textarea {
   background-position: center;
   background-size: cover;
   opacity: var(--button-image-opacity, .42);
+}
+
+.link-thumb.has-image {
+  background-image: var(--link-image);
+  background-position: center;
+  background-size: cover;
 }
 
 .link-button.featured {
