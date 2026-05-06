@@ -167,6 +167,20 @@ const defaultState = {
         headerType: "center",
         linkLayout: "stack",
         snsPosition: "top"
+      },
+      custom: {
+        images: {
+          pageBackground: "",
+          buttonBackground: ""
+        },
+        colors: {
+          pageText: "",
+          profileName: "",
+          profileHandle: "",
+          profileBio: "",
+          sectionHeading: "",
+          linkText: ""
+        }
       }
     },
     ogp: {
@@ -230,6 +244,17 @@ function escapeHTML(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function cssUrl(value) {
+  return `url('${String(value || "").replaceAll("\\", "\\\\").replaceAll("'", "\\'").replaceAll("\n", "").replaceAll("\r", "")}')`;
+}
+
+function customStyle(entries) {
+  return Object.entries(entries)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${key}:${value}`)
+    .join(";");
 }
 
 function getTemplate(id = state.page.design.templateId) {
@@ -489,6 +514,8 @@ function renderDesignPanel() {
   const d = state.page.design;
   return `
     ${panelIntro("デザイン編集", "完全自由配置ではなく、選択式で見た目を調整します。", `<button class="solid-button" data-action="keep-current">現在のデザインをキープ</button>`)}
+    ${renderImageCustomPanel(d)}
+    ${renderTextColorPanel(d)}
     <div class="grid two">
       <div class="setting-card">
         <h2>見た目</h2>
@@ -507,6 +534,56 @@ function renderDesignPanel() {
           ${select("SNS位置", "page.design.layout.snsPosition", d.layout.snsPosition, [["top", "上"], ["bottom", "下"], ["both", "上下"], ["hidden", "非表示"]])}
           ${select("文字の雰囲気", "page.design.theme.fontMood", d.theme.fontMood, [["simple", "シンプル"], ["elegant", "上品"], ["retro", "レトロ"], ["japanese", "和風"], ["magazine", "雑誌風"]])}
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderImageCustomPanel(design) {
+  const images = design.custom?.images || {};
+  return `
+    <div class="setting-card">
+      <h2>背景画像</h2>
+      <div class="grid two">
+        ${imageUploadControl("ページ背景", "pageBackground", images.pageBackground)}
+        ${imageUploadControl("ボタン背景", "buttonBackground", images.buttonBackground)}
+      </div>
+    </div>
+  `;
+}
+
+function imageUploadControl(label, target, value) {
+  const hasImage = Boolean(value);
+  const previewStyle = hasImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(value)}`)}"` : "";
+  return `
+    <div>
+      <h3>${label}</h3>
+      <div class="image-upload-row">
+        <div class="image-preview ${hasImage ? "has-image" : ""}"${previewStyle}>${hasImage ? "" : "未設定"}</div>
+        <div class="image-upload-actions">
+          <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-image-target="${target}"></label>
+          ${hasImage ? `<button class="danger-button" data-action="clear-custom-image" data-image-target="${target}">削除</button>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTextColorPanel(design) {
+  const colors = design.custom?.colors || {};
+  const controls = [
+    ["ページ全体", "pageText", colors.pageText, "#171717"],
+    ["プロフィール名", "profileName", colors.profileName, "#171717"],
+    ["ID", "profileHandle", colors.profileHandle, "#171717"],
+    ["説明文", "profileBio", colors.profileBio, "#171717"],
+    ["セクション見出し", "sectionHeading", colors.sectionHeading, "#171717"],
+    ["リンク文字", "linkText", colors.linkText, "#171717"]
+  ];
+  return `
+    <div class="setting-card">
+      <h2>文字色</h2>
+      <div class="color-grid">
+        ${controls.map(([label, key, value, fallback]) => colorInput(label, `page.design.custom.colors.${key}`, value || fallback)).join("")}
       </div>
     </div>
   `;
@@ -745,6 +822,9 @@ function renderPublicPreview() {
 
 function renderPageHTML(page, compact = false) {
   const d = page.design;
+  const custom = d.custom || {};
+  const hasPageBackground = Boolean(custom.images?.pageBackground);
+  const hasButtonBackground = Boolean(custom.images?.buttonBackground);
   const templateId = d.templateId;
   const headerType = d.layout.headerType === "magazine" ? "left" : d.layout.headerType;
   const profileClass = page.profile.layout === "hero" || d.layout.headerType === "hero" ? "hero" : headerType;
@@ -754,19 +834,34 @@ function renderPageHTML(page, compact = false) {
     `template-${templateId}`,
     `radius-${d.theme.radius}`,
     `spacing-${d.theme.spacing}`,
-    `button-${d.theme.buttonStyle}`
+    `button-${d.theme.buttonStyle}`,
+    hasPageBackground ? "custom-background" : ""
+  ].filter(Boolean).join(" ");
+  const pageStyle = customStyle({
+    "--custom-page-bg": hasPageBackground ? cssUrl(custom.images.pageBackground) : "",
+    "--button-image": hasButtonBackground ? cssUrl(custom.images.buttonBackground) : "",
+    "--page-text": custom.colors?.pageText,
+    "--profile-name-color": custom.colors?.profileName,
+    "--profile-handle-color": custom.colors?.profileHandle,
+    "--profile-bio-color": custom.colors?.profileBio,
+    "--section-heading-color": custom.colors?.sectionHeading,
+    "--link-text-color": custom.colors?.linkText
+  });
+  const buttonClass = [
+    "link-button",
+    hasButtonBackground ? "has-button-image" : ""
   ].join(" ");
   const sns = renderSns(page, profileClass);
   const showSnsTop = ["top", "both"].includes(d.layout.snsPosition);
   const showSnsBottom = ["bottom", "both"].includes(d.layout.snsPosition);
   return `
-    <div class="${pageClasses}">
+    <div class="${pageClasses}"${pageStyle ? ` style="${escapeHTML(pageStyle)}"` : ""}>
       <section class="profile ${profileClass}">
         <div class="avatar" style="--avatar-size:${page.profile.avatarSize === "large" ? "104px" : page.profile.avatarSize === "small" ? "64px" : "82px"}">${escapeHTML(page.profile.avatarText || "L").slice(0, 2)}</div>
         <div>
           <h2>${escapeHTML(page.profile.name)}</h2>
-          <p>${escapeHTML(page.profile.handle)}</p>
-          <p>${escapeHTML(page.profile.bio)}</p>
+          <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
+          <p class="profile-bio">${escapeHTML(page.profile.bio)}</p>
         </div>
       </section>
       ${showSnsTop ? sns : ""}
@@ -777,7 +872,7 @@ function renderPageHTML(page, compact = false) {
           <section class="page-section">
             <h3>${escapeHTML(section.name)}</h3>
             <div class="links ${linkLayout === "grid" || linkLayout === "cards" ? "grid" : ""}">
-              ${links.map((link) => renderLinkButton(link, linkLayout)).join("")}
+              ${links.map((link) => renderLinkButton(link, linkLayout, buttonClass)).join("")}
             </div>
           </section>
         `;
@@ -792,14 +887,18 @@ function renderSns(page, profileClass) {
   return `<div class="sns-line ${profileClass === "center" ? "center" : ""}">${page.snsLinks.map((sns) => `<a class="sns-pill" href="#">${escapeHTML(sns)}</a>`).join("")}</div>`;
 }
 
-function renderLinkButton(link, layout) {
+function renderLinkButton(link, layout, buttonClass = "link-button") {
   const thumb = link.role === "image" || layout === "cards" ? `<div class="link-thumb"></div>` : "";
   const featured = link.role === "featured" || layout === "featured" ? "featured" : "";
-  return `<a class="link-button ${featured}" href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">${thumb}<span>${escapeHTML(link.title)}</span><b>›</b></a>`;
+  return `<a class="${buttonClass} ${featured}" href="${escapeHTML(link.url)}" target="_blank" rel="noreferrer">${thumb}<span>${escapeHTML(link.title)}</span><b>›</b></a>`;
 }
 
 function input(labelText, bind, value) {
   return `<label>${labelText}<input data-bind="${bind}" value="${escapeHTML(value)}"></label>`;
+}
+
+function colorInput(labelText, bind, value) {
+  return `<label>${labelText}<input class="color-input" type="color" data-bind="${bind}" value="${escapeHTML(value)}"></label>`;
 }
 
 function textarea(labelText, bind, value) {
@@ -855,6 +954,7 @@ document.addEventListener("click", (event) => {
   if (action === "keep-current") keepCurrent();
   if (action === "apply-keep") applyKeep(target.dataset.id);
   if (action === "remove-keep") state.keeps = state.keeps.filter((keep) => keep.id !== target.dataset.id);
+  if (action === "clear-custom-image") clearCustomImage(target.dataset.imageTarget);
   if (action === "public-preview") state.publicPreview = true;
   if (action === "close-public-preview") state.publicPreview = false;
   if (action === "mock-alert") window.alert(target.dataset.message || "Prototype");
@@ -872,11 +972,38 @@ document.addEventListener("input", (event) => {
 
 document.addEventListener("change", (event) => {
   const target = event.target;
+  if (target.type === "file" && target.dataset.imageTarget) {
+    readCustomImage(target);
+    return;
+  }
   if (!target.dataset.bind) return;
   updateBind(target.dataset.bind, target.type === "checkbox" ? target.checked : target.value);
   saveState();
   render();
 });
+
+function readCustomImage(inputElement) {
+  const file = inputElement.files?.[0];
+  const imageTarget = inputElement.dataset.imageTarget;
+  if (!file || !imageTarget) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    setCustomImage(imageTarget, reader.result);
+    saveState();
+    render();
+  });
+  reader.readAsDataURL(file);
+}
+
+function setCustomImage(imageTarget, value) {
+  if (!state.page.design.custom) state.page.design.custom = { images: {}, colors: {} };
+  if (!state.page.design.custom.images) state.page.design.custom.images = {};
+  state.page.design.custom.images[imageTarget] = value || "";
+}
+
+function clearCustomImage(imageTarget) {
+  setCustomImage(imageTarget, "");
+}
 
 function updateBind(path, value) {
   if (path === "aiPrompt") {
