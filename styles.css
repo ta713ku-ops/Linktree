@@ -469,6 +469,12 @@ textarea {
   background-size: cover;
 }
 
+.avatar-image-preview {
+  border-radius: 999px;
+  background-color: #171717;
+  color: #fffaf0;
+}
+
 .image-upload-actions {
   display: flex;
   flex-wrap: wrap;

@@ -138,6 +138,7 @@ const defaultState = {
       handle: "@taku",
       bio: "制作物、SNS、予約導線をひとつにまとめた実験用プロフィール。",
       avatarText: "T",
+      avatarImage: "",
       avatarSize: "normal",
       layout: "center"
     },
@@ -452,15 +453,17 @@ function getTemplatePreviewPage(templateId) {
 function renderProfilePanel() {
   const p = state.page.profile;
   return `
-    ${panelIntro("プロフィール編集", "名前、説明、アイコン表記、プロフィール配置を編集します。")}
+    ${panelIntro("プロフィール編集", "名前、説明、プロフィール画像、配置を編集します。")}
     <div class="form-grid">
       <div class="grid two">
         ${input("名前", "page.profile.name", p.name)}
         ${input("ハンドル", "page.profile.handle", p.handle)}
       </div>
       ${textarea("説明文", "page.profile.bio", p.bio)}
-      <div class="grid three">
-        ${input("アイコン文字", "page.profile.avatarText", p.avatarText)}
+      <div class="setting-card profile-image-card">
+        ${profileImageUploadControl(p.avatarImage)}
+      </div>
+      <div class="grid two">
         ${select("写真サイズ", "page.profile.avatarSize", p.avatarSize, [["small", "小さめ"], ["normal", "標準"], ["large", "大きめ"]])}
         ${select("プロフィール配置", "page.profile.layout", p.layout, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"]])}
       </div>
@@ -563,6 +566,23 @@ function imageUploadControl(label, target, value) {
         <div class="image-upload-actions">
           <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-image-target="${target}"></label>
           ${hasImage ? `<button class="danger-button" data-action="clear-custom-image" data-image-target="${target}">削除</button>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function profileImageUploadControl(value) {
+  const hasImage = Boolean(value);
+  const previewStyle = hasImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(value)}`)}"` : "";
+  return `
+    <div>
+      <h3>プロフィール画像</h3>
+      <div class="image-upload-row">
+        <div class="image-preview avatar-image-preview ${hasImage ? "has-image" : ""}"${previewStyle}>${hasImage ? "" : "未設定"}</div>
+        <div class="image-upload-actions">
+          <label class="ghost-button image-picker">画像変更<input type="file" accept="image/*" data-profile-image="avatarImage"></label>
+          ${hasImage ? `<button class="danger-button" data-action="clear-profile-image">削除</button>` : ""}
         </div>
       </div>
     </div>
@@ -825,6 +845,7 @@ function renderPageHTML(page, compact = false) {
   const custom = d.custom || {};
   const hasPageBackground = Boolean(custom.images?.pageBackground);
   const hasButtonBackground = Boolean(custom.images?.buttonBackground);
+  const hasAvatarImage = Boolean(page.profile.avatarImage);
   const templateId = d.templateId;
   const headerType = d.layout.headerType === "magazine" ? "left" : d.layout.headerType;
   const profileClass = page.profile.layout === "hero" || d.layout.headerType === "hero" ? "hero" : headerType;
@@ -854,10 +875,15 @@ function renderPageHTML(page, compact = false) {
   const sns = renderSns(page, profileClass);
   const showSnsTop = ["top", "both"].includes(d.layout.snsPosition);
   const showSnsBottom = ["bottom", "both"].includes(d.layout.snsPosition);
+  const avatarStyle = [
+    `--avatar-size:${page.profile.avatarSize === "large" ? "104px" : page.profile.avatarSize === "small" ? "64px" : "82px"}`,
+    hasAvatarImage ? `--avatar-image:${cssUrl(page.profile.avatarImage)}` : ""
+  ].filter(Boolean).join(";");
+  const avatarText = hasAvatarImage ? "" : escapeHTML(page.profile.avatarText || page.profile.name || "L").slice(0, 2);
   return `
     <div class="${pageClasses}"${pageStyle ? ` style="${escapeHTML(pageStyle)}"` : ""}>
       <section class="profile ${profileClass}">
-        <div class="avatar" style="--avatar-size:${page.profile.avatarSize === "large" ? "104px" : page.profile.avatarSize === "small" ? "64px" : "82px"}">${escapeHTML(page.profile.avatarText || "L").slice(0, 2)}</div>
+        <div class="avatar ${hasAvatarImage ? "has-image" : ""}" style="${escapeHTML(avatarStyle)}">${avatarText}</div>
         <div>
           <h2>${escapeHTML(page.profile.name)}</h2>
           <p class="profile-handle">${escapeHTML(page.profile.handle)}</p>
@@ -955,6 +981,7 @@ document.addEventListener("click", (event) => {
   if (action === "apply-keep") applyKeep(target.dataset.id);
   if (action === "remove-keep") state.keeps = state.keeps.filter((keep) => keep.id !== target.dataset.id);
   if (action === "clear-custom-image") clearCustomImage(target.dataset.imageTarget);
+  if (action === "clear-profile-image") clearProfileImage();
   if (action === "public-preview") state.publicPreview = true;
   if (action === "close-public-preview") state.publicPreview = false;
   if (action === "mock-alert") window.alert(target.dataset.message || "Prototype");
@@ -974,6 +1001,10 @@ document.addEventListener("change", (event) => {
   const target = event.target;
   if (target.type === "file" && target.dataset.imageTarget) {
     readCustomImage(target);
+    return;
+  }
+  if (target.type === "file" && target.dataset.profileImage) {
+    readProfileImage(target);
     return;
   }
   if (!target.dataset.bind) return;
@@ -1003,6 +1034,22 @@ function setCustomImage(imageTarget, value) {
 
 function clearCustomImage(imageTarget) {
   setCustomImage(imageTarget, "");
+}
+
+function readProfileImage(inputElement) {
+  const file = inputElement.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    state.page.profile.avatarImage = reader.result || "";
+    saveState();
+    render();
+  });
+  reader.readAsDataURL(file);
+}
+
+function clearProfileImage() {
+  state.page.profile.avatarImage = "";
 }
 
 function updateBind(path, value) {
