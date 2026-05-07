@@ -6,6 +6,12 @@
 
 `index.html` をブラウザで開くと動きます。
 
+GitHub Pages では、`main` ブランチのルートから公開します。
+
+公開URL: https://ta713ku-ops.github.io/Linktree/
+
+URLを共有して他の人に触ってもらう場合は、[URL共有用説明資料.md](./URL共有用説明資料.md) を使ってください。
+
 ## 入っているもの
 
 - 21種類のテンプレート
