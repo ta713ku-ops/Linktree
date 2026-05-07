@@ -404,18 +404,43 @@ function renderPanel() {
 
 function renderTopPanel() {
   return `
-    ${panelIntro("選ぶだけで崩れないリンクページ", "テンプレート、手動カスタム、AI提案導線、有料プラン差を1つの画面で検証できます。", `<button class="solid-button" data-action="tab" data-tab="templates">テンプレートを選ぶ</button>`)}
+    ${panelIntro("プロフィールページを作って試せるサイト", "SNS、予約、作品、問い合わせなどのリンクを1ページにまとめる試作ツールです。テンプレートを選び、内容と見た目を変えて、公開ページの雰囲気まで確認できます。", `<button class="solid-button" data-action="tab" data-tab="templates">テンプレートを選ぶ</button>`)}
+    <div class="capability-strip" aria-label="このサイトでできること">
+      <article class="capability-card">
+        <span>1</span>
+        <h2>見た目を選ぶ</h2>
+        <p>21種類のテンプレートから、自分の用途に近い雰囲気を選べます。</p>
+      </article>
+      <article class="capability-card">
+        <span>2</span>
+        <h2>中身を編集する</h2>
+        <p>プロフィール文、SNS、予約、作品、問い合わせなどのリンクを追加・整理できます。</p>
+      </article>
+      <article class="capability-card">
+        <span>3</span>
+        <h2>画像と色を変える</h2>
+        <p>プロフィール画像、ページ背景、リンク背景、文字色をブラウザ上で試せます。</p>
+      </article>
+      <article class="capability-card">
+        <span>4</span>
+        <h2>公開イメージを見る</h2>
+        <p>スマホで見たときの完成イメージ、QR、OGP、分析画面の雰囲気を確認できます。</p>
+      </article>
+    </div>
     <div class="grid two">
       <div class="setting-card">
-        <h2>作成フロー</h2>
-        <div class="bar-row"><span>テンプレート</span><div class="bar-track"><div class="bar-fill" style="width:95%"></div></div><strong>${templates.length}</strong></div>
-        <div class="bar-row"><span>手動カスタム</span><div class="bar-track"><div class="bar-fill" style="width:78%"></div></div><strong>8</strong></div>
-        <div class="bar-row"><span>AI導線</span><div class="bar-track"><div class="bar-fill" style="width:66%"></div></div><strong>3案</strong></div>
+        <h2>まず試してほしい流れ</h2>
+        <div class="flow-list">
+          <p><strong>01</strong><span>テンプレートを選んで、雰囲気の違いを見る</span></p>
+          <p><strong>02</strong><span>プロフィールとリンクを自分用に変える</span></p>
+          <p><strong>03</strong><span>背景画像、リンク背景、文字色を調整する</span></p>
+          <p><strong>04</strong><span>公開ページを開いて、友達に見せる画面を確認する</span></p>
+        </div>
       </div>
       <div class="setting-card">
-        <h2>現在のページ</h2>
-        <p class="muted">テンプレート: ${escapeHTML(getTemplate().name)}</p>
-        <p class="muted">公開URL: https://example.link/${escapeHTML(state.page.slug)}</p>
+        <h2>この試作で分かること</h2>
+        <p class="muted">リンク集として使いやすいか、テンプレートに十分な違いがあるか、画像変更や公開設定の流れが分かりやすいかを確認できます。</p>
+        <p class="muted">現在のテンプレート: ${escapeHTML(getTemplate().name)}</p>
         <div class="row-actions">
           <button class="ghost-button" data-action="tab" data-tab="design">デザイン編集</button>
           <button class="solid-button" data-action="public-preview">公開ページ</button>
@@ -432,7 +457,7 @@ function renderTemplatesPanel() {
       <div class="template-board-title">
         <div class="board-rule"></div>
         <div>
-          <h1>15 の Linkページ テンプレートコンセプト</h1>
+          <h1>${templates.length} の Linkページ テンプレートコンセプト</h1>
           <p>水平思考で広げた、個性あふれるリンク集 / ミニLP UIアイデア集</p>
         </div>
         <div class="board-rule"></div>
