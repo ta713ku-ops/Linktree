@@ -310,12 +310,17 @@ function getTemplate(id = state.page.design.templateId) {
   return templates.find((template) => template.id === id) || templates[0];
 }
 
+function getTemplateArtUrl(templateId) {
+  const assetIds = ["minimal", "chalk", "sticky", "vinyl", "surf", "y2k", "arcade", "wamodern", "cafe", "luxury", "portfolio", "editorial", "craft", "botanical", "experimental"];
+  return `./assets/backgrounds/${assetIds.includes(templateId) ? templateId : "minimal"}.png`;
+}
+
 function render() {
   const root = document.querySelector("#app");
   root.innerHTML = `
     <main class="app-shell">
       ${renderTopbar()}
-      <section class="workspace ${state.activeTab === "templates" ? "templates-mode" : ""}">
+      <section class="workspace">
         ${renderSideNav()}
         <section class="editor-panel">${renderPanel()}</section>
         <aside class="preview-panel">${renderPhonePreview()}</aside>
@@ -327,19 +332,35 @@ function render() {
 }
 
 function renderTopbar() {
+  const steps = [
+    [1, "デザインを選ぶ", ["top", "templates"]],
+    [2, "プロフィール入力", ["profile"]],
+    [3, "リンクを整える", ["links", "sections"]],
+    [4, "デザインの調整", ["design", "ai", "keeps", "analytics"]],
+    [5, "公開", ["publish", "plans"]]
+  ];
+  const currentStep = steps.find(([,, tabs]) => tabs.includes(state.activeTab))?.[0] || 1;
   return `
     <header class="topbar">
       <div class="brand-mark">
-        <div class="brand-glyph">L</div>
+        <div class="brand-glyph">la.</div>
         <div>
           <div class="brand-title">Link Atelier</div>
-          <div class="brand-sub">リンクページ作成プロトタイプ</div>
+          <div class="brand-sub">リンクページ作成ツール</div>
         </div>
       </div>
-      <div class="plan-switcher" aria-label="表示プラン">
-        ${["basic", "pro", "premium"].map((plan) => `
-          <button class="${state.page.plan === plan ? "active" : ""}" data-action="set-plan" data-plan="${plan}">${planLabel[plan]}</button>
+      <div class="stepper" aria-label="作成ステップ">
+        ${steps.map(([number, label]) => `
+          <button class="step-pill ${currentStep === number ? "active" : ""}" data-action="tab" data-tab="${number === 1 ? "templates" : number === 2 ? "profile" : number === 3 ? "links" : number === 4 ? "design" : "publish"}">
+            <span>${number}</span>${label}
+          </button>
         `).join("")}
+      </div>
+      <div class="top-actions">
+        <button class="ghost-button" data-action="mock-alert" data-message="ヘルプは本番化後に追加予定です。">ヘルプ</button>
+        <button class="ghost-button" data-action="public-preview">プレビュー</button>
+        <button class="solid-button" data-action="keep-current">保存</button>
+        <div class="user-chip" aria-label="ユーザー">${escapeHTML((state.page.profile.name || "A").slice(0, 1))}</div>
       </div>
     </header>
   `;
@@ -351,14 +372,52 @@ function renderSideNav() {
     links: state.page.links.length,
     keeps: state.keeps.length
   };
+  const navLabels = {
+    top: ["⌂", "ホーム"],
+    templates: ["○", "デザインを選ぶ"],
+    profile: ["♙", "プロフィール"],
+    links: ["∞", "リンク"],
+    sections: ["§", "セクション"],
+    design: ["◇", "デザインの調整"],
+    ai: ["✦", "AI提案"],
+    keeps: ["□", "保存した案"],
+    analytics: ["⌁", "分析"],
+    publish: ["◎", "公開設定"],
+    plans: ["♕", "料金プラン"]
+  };
+  const planFeatures = {
+    basic: ["1ページ公開", "サービスロゴ表示", "キープ1件まで"],
+    pro: ["独自ドメイン", "アクセス解析", "AI提案 月10回"],
+    premium: ["複数ページ", "独自ドメイン", "AI提案 月30回"]
+  };
   return `
     <nav class="side-nav" aria-label="編集メニュー">
-      ${navItems.map(([id, label]) => `
+      <div class="nav-main">
+      ${navItems.filter(([id]) => !["sections", "analytics"].includes(id)).map(([id, label]) => {
+        const [icon, displayLabel] = navLabels[id] || ["・", label];
+        return `
         <button class="nav-button ${state.activeTab === id ? "active" : ""}" data-action="tab" data-tab="${id}">
-          <span>${label}</span>
+          <span class="nav-label"><span class="nav-icon">${icon}</span>${displayLabel}</span>
           ${counts[id] ? `<span class="nav-count">${counts[id]}</span>` : ""}
         </button>
-      `).join("")}
+      `; }).join("")}
+      </div>
+      <div class="side-card plan-card">
+        <div class="side-card-kicker">現在のプラン</div>
+        <div class="side-card-title">${planLabel[state.page.plan]}</div>
+        <span class="small-badge">年払い</span>
+        <ul>
+          ${(planFeatures[state.page.plan] || []).map((item) => `<li>${item}</li>`).join("")}
+        </ul>
+        <button class="text-link-button" data-action="tab" data-tab="plans">プランを管理する</button>
+      </div>
+      <div class="side-card access-card">
+        <div class="side-card-kicker">今月のアクセス</div>
+        <div class="access-number">${state.page.analytics.views.toLocaleString()}</div>
+        <div class="access-delta">+18.6%</div>
+        <div class="mini-chart"><span></span><span></span><span></span><span></span><span></span></div>
+        <button class="text-link-button" data-action="tab" data-tab="analytics">詳細を確認する</button>
+      </div>
     </nav>
   `;
 }
@@ -377,7 +436,7 @@ function panelIntro(title, text, action = "") {
   return `
     <div class="panel-head">
       <div>
-        <p class="eyebrow">${planLabel[state.page.plan]} Prototype</p>
+        <p class="eyebrow">${planLabel[state.page.plan]}</p>
         <h1>${title}</h1>
         <p class="muted">${text}</p>
       </div>
@@ -403,65 +462,117 @@ function renderPanel() {
 }
 
 function renderTopPanel() {
+  const visibleLinks = getOrderedVisibleLinks(state.page);
+  const currentTemplate = getTemplate();
+  const profile = state.page.profile;
+  const design = state.page.design;
   return `
-    ${panelIntro("プロフィールページを作って試せるサイト", "SNS、予約、作品、問い合わせなどのリンクを1ページにまとめる試作ツールです。テンプレートを選び、内容と見た目を変えて、公開ページの雰囲気まで確認できます。", `<button class="solid-button" data-action="tab" data-tab="templates">テンプレートを選ぶ</button>`)}
-    <div class="capability-strip" aria-label="このサイトでできること">
-      <article class="capability-card">
-        <span>1</span>
-        <h2>見た目を選ぶ</h2>
-        <p>21種類のテンプレートから、自分の用途に近い雰囲気を選べます。</p>
-      </article>
-      <article class="capability-card">
-        <span>2</span>
-        <h2>中身を編集する</h2>
-        <p>プロフィール文、SNS、予約、作品、問い合わせなどのリンクを追加・整理できます。</p>
-      </article>
-      <article class="capability-card">
-        <span>3</span>
-        <h2>画像と色を変える</h2>
-        <p>プロフィール画像、ページ背景、リンク背景、文字色をブラウザ上で試せます。</p>
-      </article>
-      <article class="capability-card">
-        <span>4</span>
-        <h2>公開イメージを見る</h2>
-        <p>スマホで見たときの完成イメージ、QR、OGP、分析画面の雰囲気を確認できます。</p>
-      </article>
-    </div>
-    <div class="grid two">
-      <div class="setting-card">
-        <h2>まず試してほしい流れ</h2>
-        <div class="flow-list">
-          <p><strong>01</strong><span>テンプレートを選んで、雰囲気の違いを見る</span></p>
-          <p><strong>02</strong><span>プロフィールとリンクを自分用に変える</span></p>
-          <p><strong>03</strong><span>背景画像、リンク背景、文字色を調整する</span></p>
-          <p><strong>04</strong><span>公開ページを開いて、友達に見せる画面を確認する</span></p>
+    <section class="home-dashboard">
+      <div class="home-hero">
+        <div>
+          <p class="eyebrow">Link Atelier</p>
+          <h1>選ぶだけで、きれいにまとまるリンクページ</h1>
+          <p class="muted">プロフィール、作品、予約、SNSをひとつのページに。今の内容を保ったまま、デザインだけを整えていけます。</p>
+          <div class="row-actions">
+            <button class="solid-button" data-action="tab" data-tab="templates">デザインを選ぶ</button>
+            <button class="ghost-button" data-action="tab" data-tab="links">リンクを整える</button>
+          </div>
+        </div>
+        <div class="hero-status-card">
+          <span>公開状態</span>
+          <strong>${state.page.publish.isPublic ? "公開中" : "非公開"}</strong>
+          <p>${state.page.slug ? `/${escapeHTML(state.page.slug)}` : "URL未設定"}</p>
         </div>
       </div>
-      <div class="setting-card">
-        <h2>この試作で分かること</h2>
-        <p class="muted">リンク集として使いやすいか、テンプレートに十分な違いがあるか、画像変更や公開設定の流れが分かりやすいかを確認できます。</p>
-        <p class="muted">現在のテンプレート: ${escapeHTML(getTemplate().name)}</p>
-        <div class="row-actions">
-          <button class="ghost-button" data-action="tab" data-tab="design">デザイン編集</button>
-          <button class="solid-button" data-action="public-preview">公開ページ</button>
-        </div>
+
+      <div class="dashboard-grid">
+        <article class="setting-card current-design-card">
+          <div>
+            <p class="card-kicker">現在のデザイン</p>
+            <h2>${escapeHTML(currentTemplate.name)}</h2>
+            <p class="muted">${escapeHTML(currentTemplate.description)}</p>
+            <div class="row-actions">
+              <button class="ghost-button" data-action="tab" data-tab="templates">変更する</button>
+              <button class="solid-button" data-action="tab" data-tab="design">デザインを調整</button>
+            </div>
+          </div>
+          <div class="mini-preview design-mini-preview">${renderPageHTML(state.page, true)}</div>
+        </article>
+
+        <article class="setting-card profile-summary-card">
+          <div class="summary-head">
+            <div class="summary-avatar ${profile.avatarImage ? "has-image" : ""}"${profile.avatarImage ? ` style="${escapeHTML(`--preview-image:${cssUrl(profile.avatarImage)}`)}"` : ""}>${profile.avatarImage ? "" : escapeHTML((profile.avatarText || profile.name || "L").slice(0, 1))}</div>
+            <div>
+              <p class="card-kicker">プロフィール</p>
+              <h2>${escapeHTML(profile.name)}</h2>
+              <p class="muted">${escapeHTML(profile.handle)}</p>
+            </div>
+          </div>
+          <p class="summary-text">${escapeHTML(profile.bio)}</p>
+          <button class="ghost-button full-button" data-action="tab" data-tab="profile">プロフィールを編集</button>
+        </article>
+
+        <article class="setting-card link-summary-card">
+          <div class="card-title-line">
+            <div>
+              <p class="card-kicker">リンク</p>
+              <h2>${visibleLinks.length}件を表示中</h2>
+            </div>
+            <button class="solid-button" data-action="tab" data-tab="links">編集</button>
+          </div>
+          <div class="home-link-list">
+            ${visibleLinks.slice(0, 4).map((link, index) => `
+              <div class="home-link-item">
+                <span>${index + 1}</span>
+                <div>
+                  <strong>${escapeHTML(link.title)}</strong>
+                  <p>${escapeHTML(link.url)}</p>
+                </div>
+              </div>
+            `).join("")}
+            ${visibleLinks.length ? "" : `<p class="muted">表示中のリンクはまだありません。</p>`}
+          </div>
+        </article>
+
+        <article class="setting-card design-adjust-card">
+          <p class="card-kicker">デザインの調整</p>
+          <h2>画像と色を整える</h2>
+          <div class="design-chip-row">
+            <span>ボタン: ${escapeHTML(design.theme.buttonStyle)}</span>
+            <span>角丸: ${escapeHTML(design.theme.radius)}</span>
+            <span>余白: ${escapeHTML(design.theme.spacing)}</span>
+          </div>
+          <p class="muted">ページ背景、リンク背景、文字色は既存の保存方式のまま調整できます。</p>
+          <button class="ghost-button full-button" data-action="tab" data-tab="design">デザインの調整を開く</button>
+        </article>
       </div>
-    </div>
-    <div class="template-grid home-template-strip" style="margin-top:16px">${templates.slice(0, 6).map(renderTemplateCard).join("")}</div>
+    </section>
   `;
 }
 
 function renderTemplatesPanel() {
+  const current = getTemplate();
   return `
-    <section class="template-board">
-      <div class="template-board-title">
-        <div class="board-rule"></div>
+    <section class="atelier-page template-page">
+      <div class="panel-head page-head">
         <div>
-          <h1>${templates.length} の Linkページ テンプレートコンセプト</h1>
-          <p>水平思考で広げた、個性あふれるリンク集 / ミニLP UIアイデア集</p>
+          <h1>テンプレートを選ぶ</h1>
+          <p class="muted">すべてのテンプレートを、どのプランでも自由に選べます。あとからいつでも変更できます。</p>
         </div>
-        <div class="board-rule"></div>
+        <button class="ghost-button" data-action="mock-alert" data-message="比較機能は本番化後に追加予定です。">比較する</button>
       </div>
+      <article class="selected-template-card">
+        <div class="template-phone selected-phone-preview">
+          <div class="template-notch"></div>
+          <div class="template-phone-screen">${renderPageHTML(state.page, true)}</div>
+        </div>
+        <div>
+          <p class="card-kicker">現在の選択中のテンプレート</p>
+          <h2>${escapeHTML(current.name)}</h2>
+          <p class="muted">${escapeHTML(current.description)}</p>
+        </div>
+        <button class="soft-static-button">選択中</button>
+      </article>
       <div class="template-grid">${templates.map(renderTemplateCard).join("")}</div>
     </section>
   `;
@@ -477,8 +588,11 @@ function renderTemplateCard(template) {
         <div class="template-notch"></div>
         <div class="template-phone-screen">${renderPageHTML(miniPage, true)}</div>
       </div>
-      <h3>${template.order}. ${escapeHTML(template.name)}</h3>
-      <p>${escapeHTML(template.description)}</p>
+      <div class="template-card-meta">
+        <h3>${escapeHTML(template.name)}</h3>
+        <span>${escapeHTML(template.description)}</span>
+      </div>
+      <button class="solid-button">選択する</button>
     </article>
   `;
 }
@@ -570,22 +684,43 @@ function applyTemplateVisuals(page, templateId) {
 function renderProfilePanel() {
   const p = state.page.profile;
   return `
-    ${panelIntro("プロフィール編集", "名前、説明、プロフィール画像、配置を編集します。")}
-    <div class="form-grid">
-      <div class="grid two">
-        ${input("名前", "page.profile.name", p.name)}
-        ${input("ハンドル", "page.profile.handle", p.handle)}
-      </div>
-      ${textarea("説明文", "page.profile.bio", p.bio)}
-      <div class="setting-card profile-image-card">
-        ${profileImageUploadControl(p.avatarImage)}
-      </div>
-      <div class="grid two">
-        ${select("写真サイズ", "page.profile.avatarSize", p.avatarSize, [["small", "小さめ"], ["normal", "標準"], ["large", "大きめ"]])}
-        ${select("プロフィール配置", "page.profile.layout", p.layout, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"]])}
+    <section class="atelier-page">
+      ${panelIntro("プロフィールを編集", "あなたの魅力が伝わるプロフィールに仕上げましょう。")}
+      <div class="profile-editor-grid">
+        <article class="setting-card profile-main-card">
+          <h2>プロフィール設定</h2>
+          <div class="profile-form-layout">
+            <div class="profile-image-card">
+              ${profileImageUploadControl(p.avatarImage)}
+              <p class="image-field-note">JPG / PNG / WEBP 推奨</p>
+            </div>
+            <div class="form-grid">
+              <div class="grid two">
+                ${input("表示名（必須）", "page.profile.name", p.name)}
+                ${input("ユーザー名（必須）", "page.profile.handle", p.handle)}
+              </div>
+              ${textarea("自己紹介", "page.profile.bio", p.bio)}
+              <div class="grid two">
+                ${select("写真サイズ", "page.profile.avatarSize", p.avatarSize, [["small", "小さめ"], ["normal", "標準"], ["large", "大きめ"]])}
+                ${select("プロフィール配置", "page.profile.layout", p.layout, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"]])}
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="setting-card">
+          <h2>表示設定</h2>
+          <div class="grid two">
+            ${select("プロフィール", "page.design.layout.headerType", state.page.design.layout.headerType, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"], ["magazine", "雑誌型"]])}
+            ${select("SNS位置", "page.design.layout.snsPosition", state.page.design.layout.snsPosition, [["top", "上"], ["bottom", "下"], ["both", "上下"], ["hidden", "非表示"]])}
+          </div>
+        </article>
+        <article class="setting-card">
+          <h2>カバー画像 / 背景</h2>
+          ${renderImageCustomPanel(state.page.design)}
+        </article>
       </div>
       ${state.page.design.templateId === "event-promo" ? renderEventMetaFields() : ""}
-    </div>
+    </section>
   `;
 }
 
@@ -605,25 +740,47 @@ function renderEventMetaFields() {
 
 function renderLinksPanel() {
   return `
-    ${panelIntro("リンク編集", "タイトル、URL、表示状態、強調の種類を編集します。", `<button class="solid-button" data-action="add-link">リンク追加</button>`)}
-    ${state.page.links.sort((a, b) => a.order - b.order).map((link, index) => `
-      <article class="link-row">
-        <div class="link-row-header">
-          <strong>リンク ${index + 1}</strong>
-          <button class="danger-button" data-action="remove-link" data-id="${link.id}">削除</button>
+    <section class="atelier-page">
+      ${panelIntro("リンクの編集", "表示順やリンク先、セクションの管理ができます。", `<div class="row-actions"><button class="ghost-button" data-action="add-section">セクションを追加</button><button class="solid-button" data-action="add-link">リンクを追加</button></div>`)}
+      <article class="setting-card link-section-card">
+        <div class="section-title-line">
+          <div><h2>メインセクション</h2><span class="small-badge">デフォルト</span></div>
+          <button class="icon-button">⌃</button>
         </div>
-        <div class="grid two">
-          ${input("タイトル", `link.${link.id}.title`, link.title)}
-          ${input("URL", `link.${link.id}.url`, link.url)}
+        <div class="link-list-editor">
+          ${state.page.links.sort((a, b) => a.order - b.order).map((link, index) => `
+            <article class="link-row">
+              <div class="link-row-top">
+                <div class="link-icon">${link.title.slice(0, 1)}</div>
+                <div class="link-fields">
+                  ${input("タイトル", `link.${link.id}.title`, link.title)}
+                  ${input("URL", `link.${link.id}.url`, link.url)}
+                </div>
+                <label class="switch-line"><input type="checkbox" data-bind="link.${link.id}.isVisible" ${link.isVisible ? "checked" : ""}><span></span></label>
+                <button class="icon-button" data-action="mock-alert" data-message="並び替えは本番化後に追加予定です。">⋮⋮</button>
+                <button class="icon-button" data-action="mock-alert" data-message="この行の入力欄から編集できます。">✎</button>
+                <button class="icon-button danger-icon" data-action="remove-link" data-id="${link.id}">⌫</button>
+              </div>
+              <div class="grid three compact-settings">
+                ${select("セクション", `link.${link.id}.sectionId`, link.sectionId, state.page.sections.map((s) => [s.id, s.name]))}
+                ${select("表示タイプ", `link.${link.id}.role`, link.role, [["standard", "通常"], ["featured", "目立たせる"], ["brand", "ブランド"], ["image", "画像付き"]])}
+                <p class="muted">表示 ${index + 1}</p>
+              </div>
+              ${linkImageUploadControl(link)}
+            </article>
+          `).join("")}
         </div>
-        <div class="grid three">
-          ${select("セクション", `link.${link.id}.sectionId`, link.sectionId, state.page.sections.map((s) => [s.id, s.name]))}
-          ${select("表示タイプ", `link.${link.id}.role`, link.role, [["standard", "通常"], ["featured", "目立たせる"], ["brand", "ブランド"], ["image", "画像付き"]])}
-          <label class="toggle-line"><input type="checkbox" data-bind="link.${link.id}.isVisible" ${link.isVisible ? "checked" : ""}>表示する</label>
-        </div>
-        ${linkImageUploadControl(link)}
+        <button class="add-dashed-button" data-action="add-link">＋ リンクを追加</button>
       </article>
-    `).join("")}
+      <article class="setting-card">
+        <h2>リンクスタイル設定</h2>
+        <div class="grid three">
+          ${select("リンクの形", "page.design.theme.radius", state.page.design.theme.radius, [["medium", "角丸"], ["pill", "カプセル"], ["square", "四角"]])}
+          ${select("アイコン表示", "page.design.layout.linkLayout", state.page.design.layout.linkLayout, [["stack", "表示する"], ["menu", "表示しない"], ["cards", "カード"]])}
+          ${select("ボタンの塗り", "page.design.theme.buttonStyle", state.page.design.theme.buttonStyle, [["filled", "塗りつぶし"], ["outline", "アウトライン"], ["soft", "ソフト"], ["glass", "半透明"]])}
+        </div>
+      </article>
+    </section>
   `;
 }
 
@@ -649,29 +806,38 @@ function renderSectionsPanel() {
 function renderDesignPanel() {
   const d = state.page.design;
   return `
-    ${panelIntro("デザイン編集", "完全自由配置ではなく、選択式で見た目を調整します。", `<button class="solid-button" data-action="keep-current">現在のデザインをキープ</button>`)}
-    ${renderImageCustomPanel(d)}
-    ${renderTextColorPanel(d)}
-    <div class="grid two">
-      <div class="setting-card">
-        <h2>見た目</h2>
-        <div class="form-grid">
-          ${select("ボタン", "page.design.theme.buttonStyle", d.theme.buttonStyle, [["outline", "枠線"], ["filled", "塗り"], ["soft", "やわらかい"], ["glass", "半透明"], ["paper", "紙風"], ["underline", "下線"], ["neon", "ネオン"], ["luxury", "高級感"]])}
-          ${select("角丸", "page.design.theme.radius", d.theme.radius, [["small", "小"], ["medium", "中"], ["large", "大"], ["pill", "丸"], ["square", "四角"]])}
-          ${select("余白", "page.design.theme.spacing", d.theme.spacing, [["compact", "コンパクト"], ["normal", "標準"], ["relaxed", "ゆったり"]])}
-          ${select("装飾量", "page.design.theme.decorationLevel", d.theme.decorationLevel, [["none", "なし"], ["subtle", "控えめ"], ["rich", "しっかり"]])}
+    <section class="atelier-page">
+      ${panelIntro("デザインの調整", "ブランドの世界観に合わせて、細部までデザインを調整できます。", `<button class="solid-button" data-action="keep-current">現在のデザインをキープ</button>`)}
+      <div class="design-layout">
+        <aside class="setting-card theme-list-card">
+          <h2>テーマを選択</h2>
+          ${templates.slice(0, 3).map((template) => `
+            <button class="theme-row ${d.templateId === template.id ? "active" : ""}" data-action="set-template" data-template="${template.id}">
+              <span class="theme-thumb" style="${escapeHTML(`--template-art:${cssUrl(getTemplateArtUrl(template.id))}`)}"></span>
+              <span><strong>${escapeHTML(template.name)}</strong><small>${escapeHTML(template.description)}</small></span>
+            </button>
+          `).join("")}
+          <button class="ghost-button full-button" data-action="tab" data-tab="templates">すべてのテーマを見る</button>
+        </aside>
+        <div class="setting-card custom-card">
+          <div class="card-title-line">
+            <div>
+              <h2>カスタマイズ設定</h2>
+              <p class="muted">文字色、背景、ボタン、余白などを調整できます。</p>
+            </div>
+            <button class="ghost-button" data-action="reset-design-custom">デフォルトに戻す</button>
+          </div>
+          ${renderTextColorPanel(d)}
+          <div class="grid two">
+            ${select("フォント", "page.design.theme.fontMood", d.theme.fontMood, [["simple", "Noto Serif JP"], ["elegant", "上品"], ["retro", "レトロ"], ["japanese", "和風"], ["magazine", "雑誌風"]])}
+            ${select("ボタンスタイル", "page.design.theme.buttonStyle", d.theme.buttonStyle, [["filled", "塗りつぶし"], ["outline", "アウトライン"], ["soft", "ソフト"], ["glass", "半透明"], ["paper", "紙風"], ["underline", "下線"], ["neon", "ネオン"], ["luxury", "高級感"]])}
+            ${select("角丸", "page.design.theme.radius", d.theme.radius, [["small", "S"], ["medium", "M"], ["large", "L"], ["pill", "XL"], ["square", "なし"]])}
+            ${select("セクションの余白", "page.design.theme.spacing", d.theme.spacing, [["compact", "コンパクト"], ["normal", "標準"], ["relaxed", "ゆったり"]])}
+          </div>
+          ${renderImageCustomPanel(d)}
         </div>
       </div>
-      <div class="setting-card">
-        <h2>構造</h2>
-        <div class="form-grid">
-          ${select("プロフィール", "page.design.layout.headerType", d.layout.headerType, [["center", "中央寄せ"], ["left", "左寄せ"], ["hero", "Hero画像型"], ["magazine", "雑誌型"]])}
-          ${select("リンク表示", "page.design.layout.linkLayout", d.layout.linkLayout, [["stack", "縦ボタン"], ["cards", "画像付きカード"], ["grid", "グリッド"], ["menu", "メニュー表"], ["featured", "強調リンク"]])}
-          ${select("SNS位置", "page.design.layout.snsPosition", d.layout.snsPosition, [["top", "上"], ["bottom", "下"], ["both", "上下"], ["hidden", "非表示"]])}
-          ${select("文字の雰囲気", "page.design.theme.fontMood", d.theme.fontMood, [["simple", "シンプル"], ["elegant", "上品"], ["retro", "レトロ"], ["japanese", "和風"], ["magazine", "雑誌風"]])}
-        </div>
-      </div>
-    </div>
+    </section>
   `;
 }
 
@@ -806,28 +972,36 @@ function renderTextColorPanel(design) {
 function renderAiPanel() {
   if (state.page.plan === "basic") {
     return `
-      ${panelIntro("AIデザイン提案", "Basicではロック表示、Pro以上ではダミーの3案生成を体験できます。")}
-      <div class="lock-card">
-        <h2>Pro以上で利用可能</h2>
-        <p class="muted">希望や画像の雰囲気をもとに、王道案・世界観案・攻めた案の3つを提案する想定です。</p>
-        <button class="solid-button" data-action="set-plan" data-plan="pro">Pro表示で試す</button>
-      </div>
+      <section class="atelier-page ai-page">
+        ${panelIntro("AIであなたらしいデザインを提案", "ページの雰囲気や大切にしたいことをもとに、デザイン案を作ります。")}
+        <div class="lock-card">
+          <h2>Pro以上で利用可能</h2>
+          <p class="muted">希望や画像の雰囲気をもとに、3つの案を提案する想定です。</p>
+          <button class="solid-button" data-action="set-plan" data-plan="pro">Pro表示で試す</button>
+        </div>
+      </section>
     `;
   }
   const allowance = state.page.plan === "premium" ? "30 / 30回" : "10 / 10回";
   return `
-    ${panelIntro("AIデザイン提案", `AIデザイン提案 残り${allowance}。現在はダミー提案です。`)}
-    <div class="ai-flow">
-      <div class="setting-card">
-        ${textarea("希望", "aiPrompt", state.aiPrompt)}
+    <section class="atelier-page ai-page">
+      ${panelIntro("AIであなたらしいデザインを提案", "ページの雰囲気や大切にしたいことを教えてください。AIがぴったりのデザインをご提案します。")}
+      <div class="ai-prompt-card setting-card">
+        ${textarea("どんな雰囲気のリンクページにしたいですか？", "aiPrompt", state.aiPrompt)}
+        <div class="filter-row taste-row">${["ナチュラル", "クリエイター", "シンプル", "ポップ", "エレガント", "モダン", "韓国っぽ", "海外風"].map((label, index) => `<button class="${index === 0 ? "active" : ""}" data-action="ai-answer" data-key="taste" data-value="${label}">${label}</button>`).join("")}</div>
         <div class="row-actions">
-          <label class="ghost-button">画像添付<input type="file" hidden data-action="mock-file"></label>
-          <button class="solid-button" data-action="generate-ai">3案生成</button>
+          <button class="solid-button" data-action="generate-ai">AIで提案を作る</button>
+          <button class="ghost-button" data-action="mock-alert" data-message="ランダム提案は本番化後に追加予定です。">ランダムで提案を見る</button>
         </div>
+        <p class="muted">残り ${allowance}</p>
       </div>
-      <div class="question-list">${renderQuestions()}</div>
       ${state.aiGenerated ? renderAiSuggestions() : ""}
-    </div>
+      <div class="setting-card recent-prompts">
+        <div class="card-title-line"><h2>最近のプロンプト</h2><button class="text-link-button" data-action="mock-alert" data-message="履歴一覧は本番化後に追加予定です。">すべて見る</button></div>
+        <p>やさしくナチュラルな雰囲気で、インテリアの世界観が伝わるページにしたいです。</p>
+        <p>シンプルで洗練された印象で、モノトーンを基調にしたいです。</p>
+      </div>
+    </section>
   `;
 }
 
@@ -856,12 +1030,14 @@ function renderQuestions() {
 
 function renderAiSuggestions() {
   const suggestions = [
-    { name: "王道案", description: "整っていて失敗しにくい見た目", templateId: "minimal", style: "outline" },
+    { name: "王道案", description: "整っていて失敗しにくいデザイン", templateId: "minimal", style: "outline" },
     { name: "世界観案", description: "雰囲気を強めたブランド寄り", templateId: "botanical", style: "glass" },
     { name: "攻めた案", description: "印象に残るコラージュ感", templateId: "experimental", style: "filled" }
   ];
   return `
-    <div class="grid three">
+    <div class="ai-suggestions setting-card">
+      <div class="card-title-line"><h2>AIの提案（3件）</h2><span class="small-badge">ベータ版</span></div>
+      <div class="grid three">
       ${suggestions.map((s, index) => {
         const page = clone(state.page);
         page.design.templateId = s.templateId;
@@ -872,22 +1048,32 @@ function renderAiSuggestions() {
             <h2>${s.name}</h2>
             <p class="muted">${s.description}</p>
             <div class="row-actions">
-              <button class="ghost-button" data-action="keep-ai" data-index="${index}">キープ</button>
-              <button class="solid-button" data-action="apply-ai" data-template="${s.templateId}" data-style="${s.style}">適用</button>
+              <button class="solid-button" data-action="apply-ai" data-template="${s.templateId}" data-style="${s.style}">この案を使う</button>
+              <button class="ghost-button" data-action="mock-alert" data-message="比較機能は本番化後に追加予定です。">比較する</button>
+              <button class="ghost-button" data-action="keep-ai" data-index="${index}">保存する</button>
             </div>
           </article>
         `;
       }).join("")}
+      </div>
     </div>
   `;
 }
 
 function renderKeepsPanel() {
   return `
-    ${panelIntro("キープデザイン", "公開前に比較しながら戻せるデザイン候補です。")}
-    <div class="grid two">
-      ${state.keeps.length ? state.keeps.map(renderKeepCard).join("") : `<div class="setting-card"><h2>キープなし</h2><p class="muted">現在のデザインまたはAI案をキープできます。</p></div>`}
-    </div>
+    <section class="atelier-page">
+      ${panelIntro("保存した案", "保存したデザインを管理できます。気に入った案を選んで編集・公開しましょう。", `<button class="solid-button" data-action="keep-current">新しい案を保存</button>`)}
+      <div class="saved-toolbar">
+        <button>並び替え：新しい順</button>
+        <button>すべてのプラン</button>
+        <button>すべてのタグ</button>
+        <input aria-label="検索" placeholder="検索...">
+      </div>
+      <div class="keep-grid">
+        ${state.keeps.length ? state.keeps.map(renderKeepCard).join("") : `<div class="setting-card"><h2>保存した案はまだありません</h2><p class="muted">現在のデザインまたはAI案を保存できます。</p></div>`}
+      </div>
+    </section>
   `;
 }
 
@@ -946,43 +1132,53 @@ function renderAnalyticsPanel() {
 function renderPublishPanel() {
   const url = `https://example.link/${escapeHTML(state.page.slug)}`;
   return `
-    ${panelIntro("公開設定", "公開URL、QR、OGP、独自ドメインの本番風UIです。", `<button class="solid-button" data-action="public-preview">公開ページ</button>`)}
-    <div class="grid two">
-      <div class="setting-card">
-        <h2>公開URL</h2>
-        <label class="toggle-line"><input type="checkbox" data-bind="page.publish.isPublic" ${state.page.publish.isPublic ? "checked" : ""}>公開する</label>
-        ${input("スラッグ", "page.slug", state.page.slug)}
-        <p class="muted">${url}</p>
-        <button class="ghost-button" data-action="mock-alert" data-message="URLをコピーしました。">コピー</button>
-      </div>
-      <div class="setting-card">
-        <h2>QRコード</h2>
-        ${renderQr()}
-        ${select("QRスタイル", "page.ogp.qrStyle", state.page.ogp.qrStyle, [["standard", "標準"], ["round", "角丸"], ["background", "背景あり"], ["logo", "ロゴ入り風"]])}
-      </div>
-      <div class="setting-card">
-        <h2>OGP</h2>
-        <div class="form-grid">
+    <section class="atelier-page publish-page">
+      ${panelIntro("公開設定", "リンクページを公開し、あなたのリンクを世界にシェアしましょう。", `<div class="publish-status-card"><span>現在のステータス</span><strong>${state.page.publish.isPublic ? "公開中" : "非公開"}</strong></div>`)}
+      <div class="publish-grid">
+        <article class="setting-card publish-main-card">
+          <h2>基本設定</h2>
+          <label class="toggle-line"><input type="checkbox" data-bind="page.publish.isPublic" ${state.page.publish.isPublic ? "checked" : ""}>公開中</label>
+          <div class="url-row"><span>https://link-atelier.com/</span>${input("ページURL（スラッグ）", "page.slug", state.page.slug)}<button class="ghost-button" data-action="mock-alert" data-message="URLをコピーしました。">コピー</button></div>
+        </article>
+        <article class="setting-card">
+          <h2>シェア用URL</h2>
+          <p class="muted">${url}</p>
+          <button class="ghost-button" data-action="mock-alert" data-message="URLをコピーしました。">コピー</button>
+        </article>
+        <article class="setting-card qr-card">
+          <h2>QRコード</h2>
+          ${renderQr()}
+          ${select("QRスタイル", "page.ogp.qrStyle", state.page.ogp.qrStyle, [["standard", "標準"], ["round", "角丸"], ["background", "背景あり"], ["logo", "ロゴ入り風"]])}
+        </article>
+        <article class="setting-card ogp-settings-card">
+          <h2>OGP画像</h2>
+          <div class="ogp-preview">
+            <div class="ogp-art"></div>
+            <div><strong>${escapeHTML(state.page.ogp.title)}</strong><p class="muted">${escapeHTML(state.page.ogp.description)}</p></div>
+          </div>
           ${input("OGPタイトル", "page.ogp.title", state.page.ogp.title)}
-          ${textarea("OGP説明文", "page.ogp.description", state.page.ogp.description)}
-          ${select("OGP画像", "page.ogp.mode", state.page.ogp.mode, [["default", "デフォルト"], ["template", "テンプレートに合わせる"], ["custom", "自分の画像を使う"]])}
-        </div>
-        <div class="ogp-preview" style="margin-top:12px">
-          <div class="ogp-art"></div>
-          <div><strong>${escapeHTML(state.page.ogp.title)}</strong><p class="muted">${escapeHTML(state.page.ogp.description)}</p></div>
+          ${textarea("OGPディスクリプション", "page.ogp.description", state.page.ogp.description)}
+        </article>
+        <article class="setting-card checklist-card">
+          <h2>公開前のチェックリスト</h2>
+          <p>☑ プロフィールが入力されています</p>
+          <p>☑ リンクが1つ以上追加されています</p>
+          <p>☑ OGP画像が設定されています</p>
+          <p>☑ ページURLは正しく設定されています</p>
+        </article>
+        <article class="setting-card">
+          <h2>独自ドメイン</h2>
+          ${state.page.plan === "premium" ? `
+            ${input("ドメイン", "page.publish.customDomain", state.page.publish.customDomain)}
+            <p class="muted">CNAME: cname.example.link</p>
+          ` : `<div class="lock-card">Premiumで利用可能</div>`}
+        </article>
+        <div class="publish-actions">
+          <button class="solid-button" data-action="public-preview">公開ページを見る</button>
+          <button class="ghost-button" data-action="mock-alert" data-message="URLをコピーしました。">URLをコピー</button>
         </div>
       </div>
-      <div class="setting-card">
-        <h2>独自ドメイン</h2>
-        ${state.page.plan === "premium" ? `
-          ${input("ドメイン", "page.publish.customDomain", state.page.publish.customDomain)}
-          <p class="muted">CNAME: cname.example.link</p>
-          <button class="ghost-button" data-action="mock-alert" data-message="接続チェックは本番化後に有効になります。">接続チェック</button>
-        ` : `
-          <div class="lock-card">Premiumで利用可能</div>
-        `}
-      </div>
-    </div>
+    </section>
   `;
 }
 
@@ -996,35 +1192,38 @@ function renderPlansPanel() {
     ["有人UI提案", "なし", "なし", "月1回"]
   ];
   return `
-    ${panelIntro("プラン確認", "課金なしでBasic / Pro / Premiumの見え方を切り替えられます。")}
-    <div class="grid three">
+    <section class="atelier-page plans-page">
+      ${panelIntro("料金プラン", "あなたの活動やブランドに合わせて、最適なプランを選びましょう。")}
+      <div class="billing-switch"><button>月払い</button><button class="active">年払い（20%お得）</button></div>
+      <div class="grid three plan-grid">
       ${["basic", "pro", "premium"].map((plan) => `
-        <div class="setting-card">
+        <div class="setting-card price-card ${state.page.plan === plan ? "current" : ""}">
+          ${state.page.plan === plan ? `<span class="current-ribbon">現在のプラン</span>` : ""}
           <h2>${planLabel[plan]}</h2>
-          <p class="muted">${plan === "basic" ? "480円/月" : plan === "pro" ? "1,980円/月" : "5,980円/月"}</p>
-          <button class="${state.page.plan === plan ? "solid-button" : "ghost-button"}" data-action="set-plan" data-plan="${plan}">表示を切り替え</button>
+          <p class="muted">${plan === "basic" ? "はじめての方におすすめ" : plan === "pro" ? "おすすめ" : "本格的に運用したい方へ"}</p>
+          <div class="price">${plan === "basic" ? "¥0" : plan === "pro" ? "¥980" : "¥2,480"}<span>/月</span></div>
+          <button class="${state.page.plan === plan ? "solid-button" : "ghost-button"}" data-action="set-plan" data-plan="${plan}">${state.page.plan === plan ? "プランを管理する" : "このプランに切り替える"}</button>
+          <p class="muted">${plan === "basic" ? "シンプルにリンクページを作成したい方に最適です。" : plan === "pro" ? "独自ドメインやアクセス解析など、成長をサポートする機能が充実。" : "高度なカスタマイズとAI提案で、さらに魅力的なページを。"}</p>
         </div>
       `).join("")}
-    </div>
-    <div class="setting-card" style="margin-top:14px">
-      ${rows.map((row) => `<div class="bar-row"><span>${row[0]}</span><div>${row[1]} / ${row[2]} / ${row[3]}</div><strong></strong></div>`).join("")}
-    </div>
+      </div>
+      <div class="setting-card compare-table">
+        ${rows.map((row) => `<div class="bar-row"><span>${row[0]}</span><div>${row[1]}</div><div>${row[2]}</div><div>${row[3]}</div></div>`).join("")}
+      </div>
+    </section>
   `;
 }
 
 function renderPhonePreview() {
+  const status = state.page.publish.isPublic ? "公開中です。" : "非公開中です。公開設定から公開できます。";
   return `
-    <div class="panel-head">
-      <div>
-        <p class="eyebrow">Phone Preview</p>
-        <h2>${escapeHTML(getTemplate().name)}</h2>
-      </div>
-      <div class="row-actions">
-        <button class="ghost-button" data-action="public-preview">公開</button>
-        <button class="solid-button" data-action="keep-current">キープ</button>
-      </div>
+    <div class="preview-head">
+      <h2>プレビュー（公開ページ）</h2>
+      <button class="icon-button" data-action="public-preview" aria-label="公開ページを開く">↗</button>
     </div>
     <div class="phone-frame"><div class="phone-screen">${renderPageHTML(state.page)}</div></div>
+    <button class="preview-open-button" data-action="public-preview">公開ページを見る <span>↗</span></button>
+    <p class="preview-status">鍵 ${status}</p>
   `;
 }
 
@@ -1364,6 +1563,7 @@ document.addEventListener("click", (event) => {
   if (action === "keep-current") keepCurrent();
   if (action === "apply-keep") applyKeep(target.dataset.id);
   if (action === "remove-keep") state.keeps = state.keeps.filter((keep) => keep.id !== target.dataset.id);
+  if (action === "reset-design-custom") resetDesignCustom();
   if (action === "clear-custom-image") clearCustomImage(target.dataset.imageTarget);
   if (action === "clear-profile-image") clearProfileImage();
   if (action === "clear-link-image") clearLinkImage(target.dataset.id, target.dataset.linkImageField);
@@ -1472,6 +1672,14 @@ function clearCustomImage(imageTarget) {
   setCustomImage(imageTarget, "");
 }
 
+function resetDesignCustom() {
+  const templateId = state.page.design.templateId;
+  applyTemplateVisuals(state.page, templateId);
+  state.page.design.theme.fontMood = defaultState.page.design.theme.fontMood;
+  state.page.design.theme.decorationLevel = defaultState.page.design.theme.decorationLevel;
+  state.page.design.custom = clone(defaultState.page.design.custom);
+}
+
 function readProfileImage(inputElement) {
   const file = inputElement.files?.[0];
   if (!file) return;
@@ -1565,7 +1773,7 @@ function applyAi(templateId, style) {
 
 function keepAi(index) {
   const suggestions = [
-    ["王道案", "整っていて失敗しにくい見た目", "minimal", "outline"],
+    ["王道案", "整っていて失敗しにくいデザイン", "minimal", "outline"],
     ["世界観案", "雰囲気を強めたブランド寄り", "botanical", "glass"],
     ["攻めた案", "印象に残るコラージュ感", "experimental", "filled"]
   ];
